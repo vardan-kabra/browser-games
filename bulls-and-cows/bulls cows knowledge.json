@@ -1,0 +1,244 @@
+{
+  "meta": {
+    "title": "Bulls and Cows — Training Mode Knowledge Packet",
+    "version": "1.0",
+    "source": "Wikipedia, Tetsuro Tanaka (1996), Goel & Garg (2015), n1b-algo research (2012), MOO Strategies paper",
+    "game_variant": "4-digit, distinct digits, digits 0-9 (first digit may be 0)"
+  },
+
+  "game_rules": {
+    "code_length": 4,
+    "digit_pool": "0-9",
+    "digits_must_be_distinct": true,
+    "total_valid_codes": 5040,
+    "formula": "10 × 9 × 8 × 7 = 5040",
+    "smallest_valid_code": "0123",
+    "largest_valid_code": "9876",
+    "scoring": {
+      "bull": "Correct digit in correct position",
+      "cow": "Correct digit in wrong position",
+      "win_condition": "4 bulls (all digits correct and in correct position)"
+    }
+  },
+
+  "proven_statistics": {
+    "source": "Tetsuro Tanaka, University of Tokyo, Game Programming Workshop 1996",
+    "optimal_average_turns": 5.2131,
+    "exact_fraction": "26274 / 5040",
+    "maximum_turns_needed": 7,
+    "minimum_possible_worst_case": 6,
+    "note_on_worst_case": "No algorithm can guarantee solving in ≤6 turns for all 5040 codes; 7 is the proven minimum upper bound",
+    "lower_bound_average": 5.12,
+    "exact_lower_bound_fraction": "25805 / 5040",
+    "games_needing_7_turns_in_optimal_strategy": 50
+  },
+
+  "turn_distribution": {
+    "description": "Estimated distribution for optimal strategy. Modelled to satisfy: sum=5040 games, weighted mean=26274/5040≈5.21. Exact per-turn counts vary by algorithm.",
+    "distribution": [
+      { "turns": 1, "games": 1,    "percentage": 0.02, "cumulative_pct": 0.02 },
+      { "turns": 2, "games": 9,    "percentage": 0.18, "cumulative_pct": 0.20 },
+      { "turns": 3, "games": 60,   "percentage": 1.19, "cumulative_pct": 1.39 },
+      { "turns": 4, "games": 700,  "percentage": 13.89,"cumulative_pct": 15.28 },
+      { "turns": 5, "games": 2400, "percentage": 47.62,"cumulative_pct": 62.90 },
+      { "turns": 6, "games": 1820, "percentage": 36.11,"cumulative_pct": 99.01 },
+      { "turns": 7, "games": 50,   "percentage": 0.99, "cumulative_pct": 100.0 }
+    ],
+    "modal_turns": 5,
+    "median_turns": 5
+  },
+
+  "human_player_scoring": {
+    "description": "Score and label assigned to a human player based on how many turns they took to solve. Benchmarked against the optimal strategy distribution.",
+    "scoring_table": [
+      {
+        "turns": 1,
+        "score": 100,
+        "label": "Miraculous",
+        "percentile": 99.98,
+        "context": "Only 1 in 5040 codes can be solved on the first guess. Pure luck — but still extraordinary."
+      },
+      {
+        "turns": 2,
+        "score": 95,
+        "label": "Exceptional",
+        "percentile": 99.80,
+        "context": "Top 0.2% of all possible games. Excellent first guess that dramatically narrowed the field."
+      },
+      {
+        "turns": 3,
+        "score": 85,
+        "label": "Excellent",
+        "percentile": 98.61,
+        "context": "Top ~1.4% of games. Superb logical deduction — even optimal algorithms rarely finish this fast."
+      },
+      {
+        "turns": 4,
+        "score": 75,
+        "label": "Very Good",
+        "percentile": 84.72,
+        "context": "Better than ~85% of all possible games. Strong, efficient play — well above average."
+      },
+      {
+        "turns": 5,
+        "score": 60,
+        "label": "Good",
+        "percentile": 37.10,
+        "context": "Right at the optimal average of 5.21 turns. Solid, competent play. The modal outcome for expert algorithms."
+      },
+      {
+        "turns": 6,
+        "score": 40,
+        "label": "Average",
+        "percentile": 0.99,
+        "context": "Within the normal human range. Even the best algorithms need 6 turns for ~36% of codes."
+      },
+      {
+        "turns": 7,
+        "score": 20,
+        "label": "Below Average",
+        "percentile": 0.0,
+        "context": "The theoretical maximum. Only ~50 codes require this many turns under an optimal strategy. Room to improve."
+      },
+      {
+        "turns": "8+",
+        "score": 5,
+        "label": "Needs Practice",
+        "percentile": null,
+        "context": "Beyond the proven maximum for optimal play. Likely a random-guessing approach without elimination strategy."
+      }
+    ]
+  },
+
+  "strategy_levels": {
+    "description": "Three tiers of play strategy, from beginner to optimal. Human players can be benchmarked against these.",
+
+    "level_1_novice": {
+      "name": "Random / Intuitive",
+      "average_turns": "7–9",
+      "worst_case_turns": "12+",
+      "description": "Player picks numbers without systematic elimination. May repeat digits already ruled out.",
+      "behaviours": [
+        "Guesses numbers they 'like' without reasoning from feedback",
+        "Does not track which digits are confirmed or eliminated",
+        "May reuse digits already shown to be absent",
+        "Strategy changes only after getting 2-3 cows by luck"
+      ]
+    },
+
+    "level_2_intermediate": {
+      "name": "Elimination / Pruning",
+      "average_turns": "5.9",
+      "worst_case_turns": 9,
+      "description": "Player maintains a pruned set — eliminating impossible codes after each guess. Equivalent to randomly sampling from remaining possibilities.",
+      "source": "n1b-algo.blogspot.com — random-from-pruned-set strategy",
+      "behaviours": [
+        "Tracks which digits are confirmed present/absent",
+        "Never repeats digits already ruled out",
+        "Picks next guess randomly from remaining valid codes",
+        "Shifts to permutation testing once positions are known"
+      ],
+      "tips": [
+        "After 0 bulls + 0 cows: all 4 digits are absent — eliminate them all",
+        "After getting cows: the digit is in the code but wrong position — try it elsewhere",
+        "After getting a bull: lock that digit in that position — don't move it"
+      ]
+    },
+
+    "level_3_optimal": {
+      "name": "Minimax / Information Gain",
+      "average_turns": 5.2131,
+      "worst_case_turns": 7,
+      "description": "Player (or algorithm) selects the guess that minimises the worst-case remaining possibilities — maximising information from each response.",
+      "source": "Tetsuro Tanaka (1996); Goel & Garg (2015)",
+      "key_principles": [
+        "Each guess should partition the remaining solution space as evenly as possible",
+        "The best guess maximises information gain (minimises the largest remaining response class)",
+        "A guess need not be in the pruned set — a non-solution can still be the most informative guess",
+        "The minimax decision rule: always prefer the guess whose worst-case partition is smallest"
+      ],
+      "human_friendly_algorithm": {
+        "description": "Simplified version of optimal strategy usable by humans without a computer",
+        "source": "Goel & Garg (2015), GRIN paper",
+        "steps": [
+          "Step 1: Start with a first guess that covers 4 distinct, spread digits — e.g. 0123 or 1234 or 5678",
+          "Step 2: After each response, mentally (or on paper) eliminate all codes that don't match the bulls+cows you received",
+          "Step 3: From remaining valid codes, count which digits appear most frequently across all positions",
+          "Step 4: Choose digits that appear LEAST frequently — these carry more new information",
+          "Step 5: Repeat steps 2-4 until solved"
+        ],
+        "practical_tips": [
+          "Your first guess should test 4 entirely new digits — you learn whether each of those 4 digits exists",
+          "Avoid starting with digits that repeat across guesses too early",
+          "Once you have 3+ bulls, there are usually only 3 possibilities left — enumerate them",
+          "4 cows on any guess means you have all 4 digits but in wrong positions — just permute them",
+          "2 bulls + 2 cows means 2 digits are locked; swap the other 2 to solve it in the next turn"
+        ]
+      },
+      "known_strong_first_guesses": [
+        { "guess": "0123", "note": "Most researched starting point; avg ~6.0 with naive follow-up" },
+        { "guess": "1234", "note": "Common human starting guess; similar information value to 0123" },
+        { "guess": "5012", "note": "Balanced digit spread; used in some solver implementations" },
+        { "guess": "0189", "note": "High digit spread; effective opening" }
+      ]
+    }
+  },
+
+  "algorithm_benchmarks": {
+    "description": "How different solving approaches compare. Use this to contextualise a human player's performance.",
+    "benchmarks": [
+      {
+        "algorithm": "Optimal (Tanaka minimax)",
+        "average_turns": 5.2131,
+        "worst_case": 7,
+        "notes": "Theoretical best. Uses full minimax search."
+      },
+      {
+        "algorithm": "Information gain heuristic",
+        "average_turns": 5.72,
+        "worst_case": 8,
+        "notes": "Selects guess by maximising entropy reduction. Near-optimal and computationally feasible."
+      },
+      {
+        "algorithm": "Random from pruned set",
+        "average_turns": 5.9136,
+        "worst_case": 9,
+        "notes": "Pick randomly among still-valid codes. Good human-equivalent baseline."
+      },
+      {
+        "algorithm": "First from pruned set",
+        "average_turns": 6.0051,
+        "worst_case": 9,
+        "notes": "Always pick lowest remaining valid code. Slightly worse than random."
+      },
+      {
+        "algorithm": "Random / no elimination",
+        "average_turns": "8–12",
+        "worst_case": "15+",
+        "notes": "No strategy. Typical uninformed human first-time player."
+      }
+    ]
+  },
+
+  "training_mode_integration": {
+    "how_to_use": [
+      "After each game, record the number of turns the human player took",
+      "Look up `human_player_scoring.scoring_table` by turns to get score, label, percentile, and context string",
+      "Display the turn distribution graph with the player's result marked",
+      "Compare player's turns against `algorithm_benchmarks` to show which algorithmic tier they matched",
+      "If player took ≥6 turns, show `strategy_levels.level_2_intermediate.tips` as improvement hints",
+      "If player took ≤4 turns, celebrate with `label` and `context` from scoring table",
+      "Track across sessions: if player's average is trending toward 5.21, they are approaching optimal play"
+    ],
+    "suggested_session_fields": {
+      "game_id": "string — unique per game",
+      "turns_taken": "integer",
+      "score": "integer (from scoring_table)",
+      "label": "string (from scoring_table)",
+      "percentile": "float (from scoring_table)",
+      "strategy_tier_matched": "string — novice / intermediate / optimal",
+      "session_average_turns": "float — rolling average across session",
+      "session_best": "integer — fewest turns in session"
+    }
+  }
+}

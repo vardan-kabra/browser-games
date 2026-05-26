@@ -1,0 +1,276 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
+
+:root {
+  --table-green: #1a6b3c;
+  --table-dark:  #0f4a29;
+  --card-w:    58px;
+  --card-h:    84px;
+  --card-w-sm: 36px;
+  --card-h-sm: 52px;
+  --red:   #c0392b;
+  --black: #111;
+}
+
+/* ── Centering shell ────────────────────────────────────────────────────────── */
+html, body {
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  background: #0a3520;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+}
+
+#game-root {
+  width: 800px; height: 600px;
+  background: var(--table-dark);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  border-radius: 12px;
+  box-shadow: 0 16px 64px rgba(0,0,0,0.6);
+  color: #f0f0f0;
+  position: relative;
+}
+
+/* ── Score bar ───────────────────────────────────────────────────────────────── */
+#score-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 14px;
+  background: rgba(0,0,0,0.45);
+  flex-shrink: 0;
+  gap: 8px;
+  height: 40px;
+}
+
+.score-chip {
+  border-radius: 20px; padding: 2px 12px;
+  font-weight: 700; font-size: 0.85rem;
+  white-space: nowrap;
+}
+.score-chip.team0 { border: 2px solid #4ade80; color: #4ade80; }
+.score-chip.team1 { border: 2px solid #f87171; color: #f87171; }
+#bid-label { font-size: 0.75rem; color: #a3e635; text-align: center; flex: 1; }
+
+/* ── Info bar (points + trump + status) ─────────────────────────────────────── */
+#info-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 3px 14px;
+  background: rgba(0,0,0,0.3);
+  flex-shrink: 0; height: 30px; gap: 6px;
+}
+
+#pts-team0, #pts-team1 {
+  font-size: 0.78rem; font-weight: 700;
+}
+#pts-team0 { color: #4ade80; }
+#pts-team1 { color: #f87171; }
+#pts-bid-target {
+  font-size: 0.75rem; color: #fde047; text-align: center; flex: 1;
+}
+
+/* ── Status bar ─────────────────────────────────────────────────────────────── */
+#status-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 3px 14px;
+  background: rgba(0,0,0,0.25);
+  flex-shrink: 0; height: 28px; gap: 6px;
+}
+#status-msg { font-size: 0.8rem; color: rgba(255,255,255,0.8); flex: 1; }
+#trump-badge {
+  font-size: 0.75rem; font-weight: 700; padding: 1px 10px;
+  border-radius: 10px; white-space: nowrap;
+}
+.trump-badge.visible       { background: rgba(253,224,71,0.18); color: #fde047; border: 1px solid #fde047; }
+.trump-badge.hidden-trump  { background: rgba(255,255,255,0.07); color: #9ca3af; }
+.trump-badge.no-trump      { background: rgba(200,200,255,0.12); color: #c4b5fd; border: 1px solid #c4b5fd; }
+.trump-badge.suit-hearts,
+.trump-badge.suit-diamonds { color: #f87171; border-color: #f87171; background: rgba(248,113,113,0.12); }
+
+/* ── Table grid ─────────────────────────────────────────────────────────────── */
+#table {
+  flex: 1;
+  display: grid;
+  grid-template-areas:
+    "top    top    top"
+    "left   center right"
+    "human  human  human";
+  grid-template-columns: 80px 1fr 80px;
+  grid-template-rows: 88px 1fr 88px;
+  padding: 6px;
+  gap: 4px;
+  overflow: hidden;
+}
+
+/* ── Seat wrappers ───────────────────────────────────────────────────────────── */
+#seat-top   { grid-area: top;   display: flex; flex-direction: column; align-items: center; gap: 3px; }
+#seat-left  { grid-area: left;  display: flex; flex-direction: column; align-items: center; justify-content: center; }
+#seat-right { grid-area: right; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+#seat-human { grid-area: human; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+#center-col { grid-area: center; display: flex; align-items: center; justify-content: center; }
+
+/* ── Player labels ───────────────────────────────────────────────────────────── */
+.player-label {
+  font-size: 0.65rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  color: rgba(255,255,255,0.45);
+  text-align: center;
+}
+.player-label.declarer { color: #fde047; }
+
+/* ── Hands ───────────────────────────────────────────────────────────────────── */
+.hand {
+  display: flex; gap: 4px;
+  justify-content: center; align-items: flex-end;
+  flex-wrap: nowrap;
+}
+#hand-0, #hand-2 { flex-direction: row; }
+
+/* Side AIs: stacked with overlap */
+#hand-1, #hand-3 { flex-direction: column; gap: 0; position: relative; }
+#hand-1 .card, #hand-3 .card { margin-bottom: -40px; }
+#hand-1 .card:last-child, #hand-3 .card:last-child { margin-bottom: 0; }
+
+/* ── Cards ───────────────────────────────────────────────────────────────────── */
+.card {
+  width: var(--card-w); height: var(--card-h);
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.15);
+  flex-shrink: 0;
+  position: relative;
+  transition: transform 0.12s, box-shadow 0.12s;
+  user-select: none;
+}
+
+/* Face-down back */
+.card.face-down {
+  background: repeating-linear-gradient(
+    135deg, #1d4ed8 0px, #1d4ed8 6px, #1e40af 6px, #1e40af 12px
+  );
+  border-color: #93c5fd;
+  width: var(--card-w-sm); height: var(--card-h-sm);
+}
+
+/* Face-up front */
+.card.face-up {
+  background: #fff;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* ── Card content (two-corner layout) ───────────────────────────────────────── */
+.corner {
+  position: absolute;
+  display: flex; flex-direction: column; align-items: center;
+  line-height: 1.1;
+}
+.corner-tl { top: 3px; left: 4px; }
+.corner-br { bottom: 3px; right: 4px; transform: rotate(180deg); }
+.c-rank { font-size: 0.82rem; font-weight: 900; line-height: 1; }
+.c-suit { font-size: 0.65rem; line-height: 1; }
+.card-center { font-size: 1.55rem; line-height: 1; pointer-events: none; }
+
+/* Suit colours */
+.suit-hearts  .corner, .suit-hearts  .card-center,
+.suit-diamonds .corner, .suit-diamonds .card-center { color: var(--red); }
+.suit-spades  .corner, .suit-spades  .card-center,
+.suit-clubs   .corner, .suit-clubs   .card-center  { color: var(--black); }
+
+/* States */
+.card.trump-card { box-shadow: 0 0 0 2px #fde047; }
+.card.playable   { cursor: pointer; box-shadow: 0 0 0 2px #4ade80; }
+.card.playable:hover { transform: translateY(-7px); box-shadow: 0 8px 18px rgba(0,0,0,0.4), 0 0 0 2px #4ade80; }
+.card.unplayable { opacity: 0.38; }
+
+/* ── Center area (trick zone) ───────────────────────────────────────────────── */
+#center-area {
+  width: 220px; height: 200px;
+  background: rgba(0,0,0,0.22);
+  border-radius: 14px;
+  display: grid;
+  grid-template-areas:
+    ".    top    ."
+    "left  mid   right"
+    ".   bottom  .";
+  grid-template-columns: 1fr auto 1fr;
+  grid-template-rows: 1fr auto 1fr;
+  align-items: center; justify-items: center;
+  padding: 6px;
+}
+
+#trick-slot-0 { grid-area: bottom; }
+#trick-slot-1 { grid-area: right;  }
+#trick-slot-2 { grid-area: top;    }
+#trick-slot-3 { grid-area: left;   }
+
+.trick-slot { width: var(--card-w); height: var(--card-h); }
+
+/* ── Trick winner animation ─────────────────────────────────────────────────── */
+@keyframes winFlash {
+  0%   { box-shadow: 0 0 0 3px #fde047; background: rgba(253,224,71,0.2); }
+  45%  { box-shadow: 0 0 14px 7px #fde047; background: rgba(253,224,71,0.4); }
+  100% { box-shadow: 0 0 0 3px #fde047; background: rgba(253,224,71,0.2); }
+}
+.trick-slot.trick-winner  { animation: winFlash 0.9s ease-in-out; border-radius: 8px; }
+.player-label.trick-winner { color: #fde047 !important; font-weight: 900 !important; }
+
+/* ── Overlay panels ─────────────────────────────────────────────────────────── */
+.overlay-panel {
+  position: absolute; inset: 0;
+  background: rgba(0,0,0,0.62);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 100;
+}
+
+.panel-card {
+  background: #1e293b; border-radius: 14px;
+  padding: 24px 28px; max-width: 340px; width: 90%;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+}
+.panel-card h2 { font-size: 1.1rem; margin-bottom: 6px; color: #f1f5f9; }
+.panel-card p  { font-size: 0.85rem; color: #94a3b8; margin-bottom: 16px; }
+
+.btn { padding: 9px 20px; border: none; border-radius: 9px; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: background 0.15s; }
+.btn-primary   { background: #6366f1; color: #fff; }
+.btn-primary:hover   { background: #4f46e5; }
+.btn-secondary { background: #334155; color: #e2e8f0; margin-left: 8px; }
+.btn-secondary:hover { background: #475569; }
+
+/* Bidding */
+#bid-row { display: flex; justify-content: center; align-items: center; gap: 10px; margin-bottom: 14px; }
+#bid-amount {
+  width: 68px; padding: 7px; font-size: 1.1rem; font-weight: 700;
+  border: 2px solid #475569; border-radius: 8px; text-align: center;
+  background: #0f172a; color: #f1f5f9; outline: none;
+}
+#bid-amount:focus { border-color: #6366f1; }
+
+/* Trump select */
+.suit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px; }
+.suit-btn {
+  padding: 12px 8px; border: 2px solid #334155; border-radius: 9px;
+  font-size: 1.25rem; background: #0f172a; cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  font-weight: 700;
+}
+.suit-btn.red   { color: var(--red); }
+.suit-btn.black { color: #e2e8f0; }
+.suit-btn.nt-btn { color: #c4b5fd; font-size: 0.95rem; }
+.suit-btn:hover { background: #1e293b; border-color: #fde047; }
+
+/* Hand result */
+#hand-result-text { font-size: 0.88rem; color: #e2e8f0; margin-bottom: 10px; line-height: 1.5; }
+.game-scores { display: flex; gap: 14px; justify-content: center; margin-bottom: 16px; font-weight: 700; font-size: 0.9rem; }
+.gs0 { color: #4ade80; } .gs1 { color: #f87171; }
+
+/* Match over */
+#match-winner-text { font-size: 1.25rem; font-weight: 700; color: #fde047; margin-bottom: 6px; }
+
+/* ── Pair prompt (toast, not full overlay) ─────────────────────────────────── */
+#pair-prompt {
+  position: absolute; bottom: 60px; left: 50%; transform: translateX(-50%);
+  background: #1e293b; border: 2px solid #fde047;
+  border-radius: 12px; padding: 12px 18px;
+  text-align: center; z-index: 200;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  min-width: 280px;
+}
+#pair-prompt p { font-size: 0.85rem; color: #fde047; margin-bottom: 10px; font-weight: 600; }

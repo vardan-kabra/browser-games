@@ -1,0 +1,168 @@
+{
+  "meta": {
+    "title": "Bulls and Cows — Deductive Logic Rules",
+    "version": "1.0",
+    "purpose": "Inference rules for turn-by-turn coaching. After each player guess, apply these rules to determine what the player could/should have deduced. Use this to give corrective or affirming feedback.",
+    "companion_file": "bulls cows knowledge.json"
+  },
+
+  "core_inference_rules": [
+    {
+      "id": "R1_zero_zero_elimination",
+      "name": "Zero-zero elimination",
+      "trigger": "A guess returns 0 bulls AND 0 cows",
+      "conclusion": "Every digit in that guess is absent from the secret",
+      "strength": "Hard — eliminates 4 digits with certainty",
+      "example": "Guess 1945 → 0B 0C means digits 1, 9, 4, 5 are all absent from the secret"
+    },
+    {
+      "id": "R2_bull_position_lock",
+      "name": "Bull = position lock candidate",
+      "trigger": "A guess returns N bulls",
+      "conclusion": "Exactly N of the guessed digits are in the secret AT their guessed positions",
+      "strength": "Partial — tells you the count but not which digits without more guesses",
+      "example": "Guess 3287 → 1B 1C means exactly one of {3 in pos 1, 2 in pos 2, 8 in pos 3, 7 in pos 4} is correct"
+    },
+    {
+      "id": "R3_cow_presence_with_position_exclusion",
+      "name": "Cow = present but not here",
+      "trigger": "A guess returns M cows",
+      "conclusion": "Exactly M of the guessed digits are in the secret BUT NOT in their guessed positions",
+      "strength": "Partial — tells you the count of misplaced digits",
+      "example": "Guess 6235 → 0B 2C means two of {6, 2, 3, 5} are in the secret, none in those positions"
+    },
+    {
+      "id": "R4_total_presence_count",
+      "name": "Bulls + cows = total digits present",
+      "trigger": "Any guess result",
+      "conclusion": "Bulls + cows = exact count of guess digits that exist anywhere in the secret",
+      "strength": "Hard — gives precise count of present digits",
+      "example": "Guess 5678 → 0B 2C means exactly 2 of {5, 6, 7, 8} are in the secret"
+    },
+    {
+      "id": "R5_singleton_forcing",
+      "name": "Singleton forcing",
+      "trigger": "A guess says K digits are present, and (K-1) or more of those digits are already known to be absent",
+      "conclusion": "The remaining undetermined digit(s) MUST be present",
+      "strength": "Hard — forced deduction",
+      "example": "If guess 1935 → 0B 1C and you already know 1, 9, 5 are absent (from other guesses), then 3 MUST be in the secret"
+    },
+    {
+      "id": "R6_position_elimination_from_zero_bulls",
+      "name": "Position elimination from 0 bulls",
+      "trigger": "A guess returns 0 bulls (but possibly cows)",
+      "conclusion": "No digit in the guess is in its guessed position",
+      "strength": "Hard — eliminates 4 position assignments",
+      "example": "Guess 5678 → 0B 2C: even though some digits are in the secret, none of them are in those exact positions (5 not in pos 1, 6 not in pos 2, 7 not in pos 3, 8 not in pos 4)"
+    },
+    {
+      "id": "R7_known_digit_position_narrowing",
+      "name": "Known digit + bull/cow narrowing",
+      "trigger": "A digit is confirmed present, and appears in multiple past guesses with bull/cow responses",
+      "conclusion": "Intersect the position constraints across guesses to narrow that digit's position",
+      "strength": "Compound — combines multiple guesses",
+      "example": "If 3 is confirmed present, and guess 3287 → 1B 1C (with 3 in pos 1) plus guess 1935 → 0B 1C (with 3 in pos 3 forbidden), then 3 is in pos 1 (because removing 3 from pos 3 means the 1C in 1935 came from 3 NOT in pos 3, and the bull in 3287 must come from 3 in pos 1 since 2, 8, 7 are constrained)"
+    },
+    {
+      "id": "R8_common_digit_intersection",
+      "name": "Multi-guess common-digit intersection",
+      "trigger": "Multiple guesses each say 'exactly 1 of these is present', with overlapping digit sets",
+      "conclusion": "The present digit must be in the intersection of all those guesses (excluding known-absent digits)",
+      "strength": "Compound — collapses possibilities fast",
+      "example": "Guesses 1209, 5209, 1205 each return 1B 0C. Common digits after removing knowns: only 0 is in all three. So 0 is the present digit, and it's in position 3 (the shared position across all three guesses)"
+    },
+    {
+      "id": "R9_pruned_set_consistency",
+      "name": "Pruned set consistency",
+      "trigger": "After any guess",
+      "conclusion": "The secret must produce EXACTLY the same bulls+cows response when compared to every past guess. Any candidate code that fails this test is eliminated.",
+      "strength": "Hard — this is the master rule that subsumes all others",
+      "example": "After 8 guesses, only codes that produce the exact response history (0B/2C, 1B/0C, 1B/0C, 1B/0C, 0B/1C, 0B/0C, 1B/1C, 0B/2C) against (5678, 1209, 5209, 1205, 1935, 1945, 3287, 6235) remain valid. In this game, only 3706 and 3806 survive."
+    },
+    {
+      "id": "R10_distinguishing_guess",
+      "name": "Distinguishing guess strategy",
+      "trigger": "Pruned set has 2 or 3 candidates remaining",
+      "conclusion": "Pick a guess (may or may not be in the pruned set) that produces DIFFERENT bulls+cows responses for each candidate. With 2 candidates, just guess one — if wrong, the other is the answer.",
+      "strength": "Endgame — guarantees solution in 1-2 more turns",
+      "example": "Pruned set = {3706, 3806}. Guessing 3706: if correct, 4B win. If secret was 3806, response is 3B 0C (since 7 differs from 8). Either way, solved by next turn."
+    }
+  ],
+
+  "coaching_signals": {
+    "description": "Patterns to detect in a player's guess history that indicate sub-optimal play. Each signal maps to a specific corrective message.",
+    "signals": [
+      {
+        "id": "S1_reused_eliminated_digit",
+        "detection": "Player includes a digit in their guess that has been definitively eliminated (e.g. by R1 zero-zero rule)",
+        "severity": "high",
+        "message_template": "Your guess {guess} on turn {turn} included digit {digit}, which you had already ruled out by guess {prior_turn} ({prior_guess} → 0B 0C). Always cross out eliminated digits before forming your next guess."
+      },
+      {
+        "id": "S2_missed_forced_presence",
+        "detection": "Player did not include a digit that was forced to be present by rule R5 (singleton forcing)",
+        "severity": "medium",
+        "message_template": "After your guess {prior_guess} on turn {prior_turn}, digit {digit} was the only candidate left from {set}. You could have used this to guide your next guess but didn't include it."
+      },
+      {
+        "id": "S3_missed_position_lock",
+        "detection": "Player had enough information to determine a specific position assignment but did not exploit it",
+        "severity": "medium",
+        "message_template": "By turn {turn}, you could have deduced that position {pos} = {digit}. Your subsequent guess {guess} did not place {digit} there."
+      },
+      {
+        "id": "S4_low_information_guess",
+        "detection": "Player's guess yields little new information given the current pruned set (i.e. the guess doesn't split the pruned set well)",
+        "severity": "low",
+        "message_template": "Guess {guess} on turn {turn} was a safe choice but didn't maximise information. A better split would have come from {suggested_guess}, which would have narrowed the pruned set faster."
+      },
+      {
+        "id": "S5_pruned_set_size_not_reducing",
+        "detection": "Pruned set size after a guess is more than 50% of the size before that guess (in mid-game, turns 3+)",
+        "severity": "medium",
+        "message_template": "Your guess {guess} on turn {turn} reduced the candidate set from {before} to {after} — less than half. Try guesses that target the most uncertain digits and positions."
+      },
+      {
+        "id": "S6_good_elimination",
+        "detection": "Player's guess significantly reduced the pruned set (more than 70%)",
+        "severity": "positive",
+        "message_template": "Excellent guess on turn {turn}: {guess} reduced the candidate set from {before} to {after}. Sharp information gain."
+      }
+    ]
+  },
+
+  "training_workflow": {
+    "description": "How Claude Code should use these rules in training mode",
+    "steps": [
+      "Initialise: At game start, the full pruned set is all 5040 distinct-digit codes",
+      "After each player guess: Apply rule R9 to compute the new pruned set based on the bulls+cows response",
+      "Track inferences: Maintain three lists — confirmed_present_digits, confirmed_absent_digits, position_locks",
+      "After each player guess: Apply rules R1–R8 to update these lists",
+      "Detect signals: Check each coaching signal (S1–S6) against the player's actual guess history",
+      "At game end: Generate a debrief that combines the scoring (from main knowledge file) with the deductive coaching signals",
+      "Report format: For each turn, show (a) what the player guessed, (b) the response, (c) what could have been deduced, (d) whether the player exploited that deduction in their next guess"
+    ]
+  },
+
+  "worked_example_from_real_game": {
+    "secret_candidates_after_8_guesses": ["3706", "3806"],
+    "guess_history": [
+      { "turn": 1, "guess": "5678", "response": "0B 2C", "key_inference": "Exactly 2 of {5,6,7,8} are in the secret, none in those positions" },
+      { "turn": 2, "guess": "1209", "response": "1B 0C", "key_inference": "Exactly 1 of {1,2,0,9} is in the secret at its position (combined with later guesses → 0 in pos 3)" },
+      { "turn": 3, "guess": "5209", "response": "1B 0C", "key_inference": "Confirms via intersection that the shared digit between 1209 and 5209 (which is 2, 0, or 9) is the present one" },
+      { "turn": 4, "guess": "1205", "response": "1B 0C", "key_inference": "Three-way intersection of 1209, 5209, 1205 → only 0 is common across all → 0 is present and in position 3" },
+      { "turn": 5, "guess": "1935", "response": "0B 1C", "key_inference": "One of {1,9,3,5} present but in wrong position. Need more info." },
+      { "turn": 6, "guess": "1945", "response": "0B 0C", "key_inference": "HARD ELIMINATION: digits 1, 9, 4, 5 are all absent. Now turn 5 collapses: 3 MUST be the present digit from 1935" },
+      { "turn": 7, "guess": "3287", "response": "1B 1C", "key_inference": "3 is confirmed present (from turn 6 collapse). So one more of {2,8,7} is present. The 1B is 3 in pos 1." },
+      { "turn": 8, "guess": "6235", "response": "0B 2C", "key_inference": "5 absent, 3 present → one of {6,2} is the second present digit. Combined with turn 1 (2 of {6,7,8} present), 6 must be the one. So second digit from turn 7 is 7 or 8." }
+    ],
+    "final_deduction": "Position 1 = 3, position 3 = 0, position 4 = 6, position 2 = either 7 or 8. Two candidates: 3706 or 3806. Optimal turn 9 guess: either one (3B 0C response identifies the other).",
+    "coaching_observations": [
+      "Turns 2, 3, 4 (1209, 5209, 1205) were excellent — three guesses with overlapping digits forced the position-3=0 deduction by intersection",
+      "Turn 6 (1945) was the critical breakthrough — the 0B 0C result collapsed turn 5 into a forced deduction (3 must be present)",
+      "Turn 7 (3287) was strong — tested the unknown digits from {6,7,8} while including the now-confirmed 3",
+      "Turn 8 (6235) was sub-optimal: by this point the player could have already narrowed to a 2-candidate set. A guess of 3706 or 3806 directly would have ended the game in 1-2 more turns. Including 5 (already eliminated by turn 6) and 2 (consistently shown absent) wasted information",
+      "Net assessment: solid mid-game (turns 1-7), one wasted move at turn 8"
+    ]
+  }
+}

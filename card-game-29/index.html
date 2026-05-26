@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>29 — Card Game</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div id="game-root">
+
+  <!-- ── Score bar ──────────────────────────────────────────────────────────── -->
+  <div id="score-bar">
+    <span class="score-chip team0">North–South: <span id="score-team0">0</span></span>
+    <span id="bid-label"></span>
+    <span class="score-chip team1">East–West: <span id="score-team1">0</span></span>
+  </div>
+
+  <!-- ── Info bar (live points + trump) ────────────────────────────────────── -->
+  <div id="info-bar">
+    <span id="pts-team0">N–S: 0 pts</span>
+    <span id="pts-bid-target"></span>
+    <span id="pts-team1">E–W: 0 pts</span>
+  </div>
+
+  <!-- ── Status bar ────────────────────────────────────────────────────────── -->
+  <div id="status-bar">
+    <span id="status-msg"></span>
+    <span id="trump-badge" class="trump-badge"></span>
+  </div>
+
+  <!-- ── Card table ─────────────────────────────────────────────────────────── -->
+  <div id="table">
+
+    <!-- Top (partner, seat 2) -->
+    <div id="seat-top">
+      <div class="player-label" id="label-2">North</div>
+      <div class="hand" id="hand-2"></div>
+    </div>
+
+    <!-- Left AI (seat 3) -->
+    <div id="seat-left">
+      <div class="player-label" id="label-3">West</div>
+      <div class="hand" id="hand-3"></div>
+    </div>
+
+    <!-- Center trick zone -->
+    <div id="center-col">
+      <div id="center-area">
+        <div id="trick-slot-2" class="trick-slot"></div>
+        <div id="trick-slot-3" class="trick-slot"></div>
+        <div id="trick-slot-1" class="trick-slot"></div>
+        <div id="trick-slot-0" class="trick-slot"></div>
+      </div>
+    </div>
+
+    <!-- Right AI (seat 1) -->
+    <div id="seat-right">
+      <div class="player-label" id="label-1">East</div>
+      <div class="hand" id="hand-1"></div>
+    </div>
+
+    <!-- Human (seat 0) -->
+    <div id="seat-human">
+      <div class="hand" id="hand-0"></div>
+      <div class="player-label" id="label-0">South (You)</div>
+    </div>
+
+  </div><!-- #table -->
+
+  <!-- ── Bidding overlay ────────────────────────────────────────────────────── -->
+  <div id="bidding-panel" class="overlay-panel" hidden>
+    <div class="panel-card">
+      <h2>Your Bid</h2>
+      <p>Bid higher than the current high, or pass.</p>
+      <div id="bid-row">
+        <input id="bid-amount" type="number" min="16" max="29" value="16" />
+      </div>
+      <button class="btn btn-primary" onclick="onBidSubmit()">Bid</button>
+      <button class="btn btn-secondary" onclick="onPass()">Pass</button>
+    </div>
+  </div>
+
+  <!-- ── Trump select overlay ───────────────────────────────────────────────── -->
+  <div id="trump-select-panel" class="overlay-panel" hidden>
+    <div class="panel-card">
+      <h2>Choose Trump</h2>
+      <p>You won the bid — pick your trump suit (kept secret), or play No Trump.</p>
+      <div class="suit-grid">
+        <button class="suit-btn black" onclick="onSelectTrump('spades')">♠ Spades</button>
+        <button class="suit-btn red"   onclick="onSelectTrump('hearts')">♥ Hearts</button>
+        <button class="suit-btn red"   onclick="onSelectTrump('diamonds')">♦ Diamonds</button>
+        <button class="suit-btn black" onclick="onSelectTrump('clubs')">♣ Clubs</button>
+        <button class="suit-btn nt-btn" style="grid-column:1/-1" onclick="onSelectTrump('none')">NT — No Trump</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Royal pair prompt (toast, not full overlay) ───────────────────────── -->
+  <div id="pair-prompt" hidden>
+    <p>You hold K+Q of trump — declare the Royal Pair?</p>
+    <button class="btn btn-primary" onclick="onDeclarePair()">Declare Pair</button>
+    <button class="btn btn-secondary" onclick="onSkipPair()">Skip</button>
+  </div>
+
+  <!-- ── Hand result overlay ────────────────────────────────────────────────── -->
+  <div id="hand-result-panel" class="overlay-panel" hidden>
+    <div class="panel-card">
+      <h2>Hand Over</h2>
+      <p id="hand-result-text"></p>
+      <div class="game-scores">
+        <span class="gs0" id="hand-score-team0"></span>
+        <span class="gs1" id="hand-score-team1"></span>
+      </div>
+      <button class="btn btn-primary" onclick="onNextHand()">Next Hand</button>
+    </div>
+  </div>
+
+  <!-- ── Match over overlay ─────────────────────────────────────────────────── -->
+  <div id="match-over-panel" class="overlay-panel" hidden>
+    <div class="panel-card">
+      <div id="match-winner-text"></div>
+      <p id="match-score-text"></p>
+      <button class="btn btn-primary" onclick="onNewMatch()">New Match</button>
+    </div>
+  </div>
+
+</div><!-- #game-root -->
+
+<script src="cards.js"></script>
+<script src="ai.js"></script>
+<script src="game.js"></script>
+</body>
+</html>

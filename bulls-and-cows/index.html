@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bulls &amp; Cows</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <header>
+    <h1>Bulls &amp; Cows</h1>
+    <p>Crack the secret 4-digit number. No repeated digits.</p>
+  </header>
+
+  <div class="card">
+
+    <section id="rules">
+      <h2>How to play</h2>
+      <ul>
+        <li><span class="bull-dot">&#9679;</span> <strong>Bull</strong> — right digit, right position</li>
+        <li><span class="cow-dot">&#9679;</span> <strong>Cow</strong> — right digit, wrong position</li>
+        <li><span style="opacity:0">&#9679;</span> All four digits in the secret are unique</li>
+      </ul>
+    </section>
+
+    <label id="training-toggle">
+      <input type="checkbox" id="training-checkbox" />
+      Training mode — get a post-win breakdown of your deductions
+    </label>
+
+    <section id="input-area">
+      <div class="input-row">
+        <input
+          id="guess-input"
+          type="text"
+          inputmode="numeric"
+          maxlength="4"
+          placeholder="1234"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <button id="guess-btn" onclick="submitGuess()">Guess</button>
+      </div>
+      <span id="error-msg"></span>
+    </section>
+
+    <div id="win-screen" hidden>
+      <div class="trophy">&#127881;</div>
+      <h2>You cracked it!</h2>
+      <p>Solved in <strong><span id="win-turns"></span> turns</strong></p>
+
+      <div id="score-badge"></div>
+      <p id="score-context"></p>
+      <p id="optimal-line"></p>
+
+      <div id="distribution-wrap">
+        <span class="dist-title">Where you landed (optimal-play distribution)</span>
+        <div id="distribution-chart"></div>
+      </div>
+
+      <div id="debrief-tip"></div>
+
+      <div id="turn-coaching">
+        <h3>Turn-by-turn — what you could improve</h3>
+        <ol id="coaching-rounds"></ol>
+      </div>
+
+      <button id="new-game-btn" onclick="newGame()">Play Again</button>
+    </div>
+
+    <div id="training-panel" hidden>
+      <h2>Training feedback</h2>
+      <div id="training-summary"></div>
+
+      <div id="digit-tracker">
+        <span class="tracker-label">Final digit knowledge</span>
+        <div id="digit-chips"></div>
+        <div class="tracker-legend">
+          <span class="lg lg-in">in the secret</span>
+          <span class="lg lg-out">ruled out</span>
+          <span class="lg lg-unknown">unknown</span>
+        </div>
+      </div>
+
+      <h2>How a solver would play</h2>
+      <p class="solver-note">Same secret, starting from your first guess.</p>
+      <table id="solver-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Guess</th>
+            <th>Bulls</th>
+            <th>Cows</th>
+          </tr>
+        </thead>
+        <tbody id="solver-body"></tbody>
+      </table>
+    </div>
+
+    <div id="history-header">
+      <h2>Guesses</h2>
+      <span id="turn-counter">Turn 0</span>
+    </div>
+
+    <table id="history-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Guess</th>
+          <th>Bulls</th>
+          <th>Cows</th>
+        </tr>
+      </thead>
+      <tbody id="history-body"></tbody>
+    </table>
+
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>

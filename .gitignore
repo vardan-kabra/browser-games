@@ -1,0 +1,14 @@
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/
+*.swp
+
+# Dependencies (none today, but just in case)
+node_modules/
+
+# Local scratch / test files
+_test.js
