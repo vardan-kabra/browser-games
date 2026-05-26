@@ -26,7 +26,9 @@ git commit -m "message"
 git push origin main
 ```
 
-**Commit and push regularly as you work — don't wait to be asked.** After each meaningful, self-contained change (a feature, a fix, a refactor), `git add` the relevant files, commit with a clean descriptive message, and `git push origin main`. The goal is that work is never lost and the GitHub repo always reflects the current state. Keep commit messages clear and scoped to one logical change; avoid lumping unrelated edits together. After pushing, the commit is viewable at `https://github.com/vardan-kabra/browser-games/commit/<sha>`.
+**Pending work is auto-committed and pushed when the session ends.** A `SessionEnd` hook in `.claude/settings.json` runs `git add -A`, commits anything staged with a timestamped "Auto-commit on session end" message, and pushes to `origin main` — so work is never lost between sessions even if no explicit commit was made.
+
+When you reach a meaningful, self-contained milestone *during* a session (a finished feature, a fix), prefer making a real commit with a clean, descriptive message scoped to that one change, rather than leaving it for the catch-all session-end commit. The auto-commit is a safety net, not a substitute for good commit messages. After pushing, a commit is viewable at `https://github.com/vardan-kabra/browser-games/commit/<sha>`.
 
 ## Architecture
 

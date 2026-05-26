@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "git add -A && (git diff --cached --quiet || git commit -q -m \"Auto-commit on session end: $(date '+%Y-%m-%d %H:%M:%S')\") && git push -q origin main || true",
+            "statusMessage": "Auto-committing and pushing to GitHub...",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}
