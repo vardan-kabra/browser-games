@@ -8,7 +8,7 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icon-192.png" />
-  <link rel="stylesheet" href="style.css?v=2" />
+  <link rel="stylesheet" href="style.css?v=3" />
 </head>
 <body>
 
@@ -65,10 +65,14 @@
         <div id="distribution-chart"></div>
       </div>
 
-      <div id="debrief-tip"></div>
-
       <div id="turn-coaching">
-        <h3>Turn-by-turn — what you could improve</h3>
+        <h3>Turn-by-turn analysis</h3>
+        <div class="coach-legend">
+          <span class="lg lg-bull">bull — right spot</span>
+          <span class="lg lg-cow">cow — in code, wrong spot</span>
+          <span class="lg lg-out">not in the code</span>
+          <span class="lg lg-unknown">still unknown</span>
+        </div>
         <ol id="coaching-rounds"></ol>
       </div>
 
@@ -87,8 +91,9 @@
         <span class="tracker-label">Final digit knowledge</span>
         <div id="digit-chips"></div>
         <div class="tracker-legend">
-          <span class="lg lg-in">in the secret</span>
-          <span class="lg lg-out">ruled out</span>
+          <span class="lg lg-bull">right spot</span>
+          <span class="lg lg-cow">in code, wrong spot</span>
+          <span class="lg lg-out">not in the code</span>
           <span class="lg lg-unknown">unknown</span>
         </div>
       </div>
@@ -132,7 +137,7 @@
 
   </div>
 
-  <script src="game.js?v=2"></script>
+  <script src="game.js?v=3"></script>
   <script>
     // Register the service worker so the game installs and runs offline.
     if ('serviceWorker' in navigator) {

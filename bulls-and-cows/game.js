@@ -144,8 +144,6 @@ const TURN_DISTRIBUTION = [
   { turns: 7, games: 50,   percentage: 0.99 },
 ];
 
-const STRONG_OPENERS = ['0123', '1234', '5678', '0189'];
-
 function scoreForTurns(turns) {
   return SCORING_TABLE[turns] || SCORING_TABLE['8+'];
 }
@@ -178,15 +176,6 @@ function humanScoreForTurns(turns) {
 // vs the table's harsher "Below Average" for the same 7-turn game).
 function optimalComparisonLine(turns) {
   return `For reference, a perfect computer solver averages 5.21 turns and never needs more than 7 — you did it in ${turns}.`;
-}
-
-// Turn-banded improvement tip (from the coach prompt).
-function strategyTipForTurns(turns) {
-  if (turns <= 3) return 'Exceptional logic — no notes. You played this about as well as anyone could.';
-  if (turns <= 5) return 'You’re playing well. To sharpen further: after each response, ask which guess splits the remaining possibilities most evenly — not just which number feels right.';
-  if (turns === 6) return 'Good game. Track your pruned set: after each guess, cross off every code that couldn’t have produced the bulls + cows you got, and pick your next guess from what’s left.';
-  if (turns === 7) return 'You got there! Eliminate more aggressively — a 0 bulls / 0 cows result means all four of those digits are absent, so rule them out everywhere at once.';
-  return 'Focus on the elimination rule: when a guess returns 0 bulls and 0 cows, all four digits are absent. Use that to cross out huge swaths of possibilities immediately.';
 }
 
 // ---------------------------------------------------------------------------
@@ -299,38 +288,6 @@ function deriveKnowledge(pool) {
   return { knownIn, knownOut, lockedPositions };
 }
 
-// Grade a round by how much information it produced — NOT by candidate
-// membership. A clever probe that can't be the answer still scores well.
-function gradeRound(rec) {
-  if (rec.bulls === 4) return 'solved';
-  if (rec.poolBefore === 1) return 'confirm';          // only one number was left
-  if (rec.reusedDeadDigits.length > 0) return 'slip';  // wasted ≥1 slot on a dead digit
-  if (rec.fractionEliminated >= 0.80) return 'sharp';
-  if (rec.fractionEliminated >= 0.50) return 'good';
-  if (rec.fractionEliminated > 0) return 'ok';
-  return 'flat';                                        // gained nothing new
-}
-
-// Largest pool for which we compute a concrete "better move" (minimax is O(n²);
-// by the time a round is flagged sub-optimal the pool is almost always tiny).
-const SUGGEST_LIMIT = 1000;
-
-// What the player could have done better this round. Only suggests a concrete
-// guess when a strictly tighter worst-case guarantee exists.
-function computeImprovement(rec, poolArr) {
-  if (rec.bulls === 4) return null;
-  const before = poolArr.length;
-  if (before <= 1) return null;
-  if (before <= 3) return { type: 'endgame', candidates: poolArr.slice() };
-  if (before > SUGGEST_LIMIT) return null;
-  const playerWorst = worstBucket(poolArr, rec.guess);
-  const opt = minimaxGuess(poolArr);
-  if (opt.worst < playerWorst) {
-    return { type: 'better', guess: opt.guess, optimalWorst: opt.worst, playerWorst };
-  }
-  return null;  // the player's guess was already (near-)optimal
-}
-
 // Walk the guess log front-to-back, tracking how the pool shrinks and what
 // each round established. Information-gain framing: probes are valued, and the
 // only flagged slip is reusing a digit already proven absent.
@@ -343,7 +300,6 @@ function analyzeGame(log) {
 
   log.forEach((entry, idx) => {
     const round = idx + 1;
-    const poolBeforeArr = pool;          // candidate array before this guess
     const poolBefore = pool.length;
     const knowledgeBefore = deriveKnowledge(pool);
     const guessDigits = entry.guess.split('').map(Number);
@@ -397,8 +353,6 @@ function analyzeGame(log) {
       lockedPositions: knowledgeAfter.lockedPositions,
       forced: poolBefore === 1,
     };
-    rec.grade = gradeRound(rec);
-    rec.improvement = computeImprovement(rec, poolBeforeArr);
     rounds.push(rec);
   });
 
@@ -419,25 +373,55 @@ function analyzeGame(log) {
   };
 }
 
-// Plain-language statement of what this response let you deduce. Everything here
-// is sourced from the pruned set (deriveKnowledge), so it never overclaims.
-function deductionLine(r) {
-  if (r.bulls === 4 || r.forced) return '';
-  if (r.deduction.zeroZero) {
-    return `0 bulls, 0 cows → ${r.guess.split('').join(', ')} are all out of the secret.`;
+// Per-digit knowledge state after a round, in the player-facing colour language:
+//   'bull'    — proven in the code AND its position is pinned (green)
+//   'cow'     — proven in the code, position not yet known (yellow)
+//   'out'     — proven absent (grey)
+//   'unknown' — not yet determined (no highlight)
+// All four states come straight from the pruned candidate set (deriveKnowledge),
+// so the colours never claim more than is actually provable.
+function classifyDigits(r) {
+  const lockedDigits = new Set(r.lockedPositions.map(l => +l.digit));
+  const inSet = new Set(r.knownIn);
+  const outSet = new Set(r.knownOut);
+  const states = [];
+  for (let d = 0; d <= 9; d++) {
+    if (lockedDigits.has(d)) states.push('bull');
+    else if (inSet.has(d)) states.push('cow');
+    else if (outSet.has(d)) states.push('out');
+    else states.push('unknown');
   }
-  const n = r.deduction.presentCount;
-  let line = `${n} of these digit${n === 1 ? ' is' : 's are'} in the secret`;
-  if (r.deduction.zeroBulls && r.cows > 0) line += ', none in the positions you tried';
+  return states;
+}
+
+// The logic that turns this round's bulls/cows response into provable facts —
+// the reasoning a careful player should have done. Phrased to mirror the colour
+// grid (grey / yellow / green) drawn beside it.
+function coachingLogic(r) {
+  if (r.bulls === 4) return 'All four digits correct and in place — solved.';
+  if (r.forced) return 'Only one possible code was left, so this guess was already a certainty.';
+
+  const digits = r.guess.split('').join(', ');
+  if (r.deduction.zeroZero) {
+    return `0 bulls and 0 cows: none of ${digits} are in the code — rule all four out (grey).`;
+  }
+
+  const present = r.deduction.presentCount;        // bulls + cows
+  let line = `${r.bulls} bull${r.bulls === 1 ? '' : 's'} + ${r.cows} cow${r.cows === 1 ? '' : 's'}: `
+    + `${present} of (${digits}) ${present === 1 ? 'is' : 'are'} in the code`;
+  if (r.bulls === 0 && r.cows > 0) line += ', but none in the positions you tried';
   line += '.';
 
+  // Mention only the facts this turn newly established, mapped to the grid colours.
+  const lockedDigits = new Set(r.deduction.newlyLocked.map(l => +l.digit));
+  const newCows = r.deduction.newlyIn.filter(d => !lockedDigits.has(d));
   const facts = [];
-  if (r.deduction.newlyOut.length) facts.push(`rules out ${r.deduction.newlyOut.join(', ')}`);
-  if (r.deduction.newlyIn.length) facts.push(`confirms ${r.deduction.newlyIn.join(', ')} present`);
+  if (r.deduction.newlyOut.length) facts.push(`rules out ${r.deduction.newlyOut.join(', ')} (grey)`);
+  if (newCows.length) facts.push(`confirms ${newCows.join(', ')} in the code (yellow)`);
   if (r.deduction.newlyLocked.length) {
-    facts.push(r.deduction.newlyLocked.map(l => `pins position ${l.pos + 1} = ${l.digit}`).join(', '));
+    facts.push(r.deduction.newlyLocked.map(l => `pins position ${l.pos + 1} to ${l.digit} (green)`).join(', '));
   }
-  if (facts.length) line += ` This ${facts.join('; ')}.`;
+  if (facts.length) line += ` Cross-referenced with earlier turns, this ${facts.join('; ')}.`;
   return line;
 }
 
@@ -459,18 +443,7 @@ function missedTip(r) {
     tips.push(r.missedLock.map(l => `position ${l.pos + 1} was already pinned to ${l.digit}`).join('; ')
       + ` — this guess didn't place ${s ? 'it' : 'them'} there`);
   }
-  return tips.length ? 'Heads up: ' + tips.join('; ') + '.' : '';
-}
-
-// Concrete "what you could have done better" for one round.
-function improvementLine(r) {
-  if (r.bulls === 4) return '';
-  const imp = r.improvement;
-  if (!imp) return '✓ Well played — hard to improve on this one.';
-  if (imp.type === 'endgame') {
-    return `Only ${imp.candidates.length} possibilities were left (${imp.candidates.join(' or ')}) — guessing one of them settles it in 1–2 turns.`;
-  }
-  return `Sharper: ${imp.guess} would have guaranteed at most ${imp.optimalWorst} left, where ${r.guess} could leave up to ${imp.playerWorst}.`;
+  return tips.length ? 'You could have analyzed this differently: ' + tips.join('; ') + '.' : '';
 }
 
 // Replay the same secret with a perfect solver, seeded with the user's first
@@ -519,18 +492,6 @@ function renderDebrief(turns) {
   document.getElementById('score-context').textContent = s.context;
   document.getElementById('optimal-line').textContent = optimalComparisonLine(turns);
 
-  const tipEl = document.getElementById('debrief-tip');
-  tipEl.innerHTML = '';
-  const tip = document.createElement('p');
-  tip.textContent = strategyTipForTurns(turns);
-  tipEl.appendChild(tip);
-  if (turns >= 6) {
-    const op = document.createElement('p');
-    op.className = 'opener-tip';
-    op.textContent = 'Strong openings to try next time: ' + STRONG_OPENERS.join(', ') + '.';
-    tipEl.appendChild(op);
-  }
-
   renderDistribution(turns);
 }
 
@@ -578,55 +539,46 @@ function renderDistribution(turns) {
 // Turn-by-turn coaching (shown on EVERY win) + Training extras (toggle only)
 // ---------------------------------------------------------------------------
 
-// The always-on per-round breakdown: quality, deduction, what you overlooked,
-// and the concrete better move.
+// The always-on per-round breakdown. For each turn it shows the 0–9 digit grid
+// coloured by what was provable AFTER that turn (grey = out, yellow = cow,
+// green = bull, plain = unknown) and a plain-language statement of the logic.
 function renderCoachingRounds(analysis) {
   const ol = document.getElementById('coaching-rounds');
   ol.innerHTML = '';
   for (const r of analysis.rounds) {
     const li = document.createElement('li');
-    li.className = 'round-' + r.grade;
+    li.className = 'coach-round';
 
-    const badge = document.createElement('span');
-    badge.className = 'grade-badge grade-' + r.grade;
-    badge.textContent = r.grade;
-    li.appendChild(badge);
-
-    const head = document.createElement('span');
+    const head = document.createElement('div');
     head.className = 'coach-head';
-    head.textContent = ` Round ${r.round} · ${r.guess} → ${r.bulls}B ${r.cows}C`;
+    head.innerHTML = `Round ${r.round} &middot; <strong>${r.guess}</strong> &rarr; ${r.bulls}B ${r.cows}C`;
     li.appendChild(head);
 
-    const bar = document.createElement('div');
-    bar.className = 'narrow-bar';
-    const fill = document.createElement('div');
-    fill.className = 'narrow-fill grade-' + r.grade;
-    fill.style.width = Math.round(r.fractionEliminated * 100) + '%';
-    bar.appendChild(fill);
-    li.appendChild(bar);
-
-    const ded = deductionLine(r);
-    if (ded) {
-      const d = document.createElement('div');
-      d.className = 'round-deduction';
-      d.textContent = ded;
-      li.appendChild(d);
+    // 0–9 knowledge grid as it stood after this turn.
+    const grid = document.createElement('div');
+    grid.className = 'digit-grid';
+    const states = classifyDigits(r);
+    for (let d = 0; d <= 9; d++) {
+      const chip = document.createElement('span');
+      chip.className = 'dchip dchip-' + states[d];
+      chip.textContent = d;
+      grid.appendChild(chip);
     }
+    li.appendChild(grid);
 
-    const missed = missedTip(r);
-    if (missed) {
-      const m = document.createElement('div');
-      m.className = 'round-missed';
-      m.textContent = missed;
-      li.appendChild(m);
-    }
+    // The deductive logic for this turn.
+    const logic = document.createElement('div');
+    logic.className = 'coach-logic';
+    logic.textContent = coachingLogic(r);
+    li.appendChild(logic);
 
-    const imp = improvementLine(r);
-    if (imp) {
-      const b = document.createElement('div');
-      b.className = imp.startsWith('✓') ? 'round-welldone' : 'round-better';
-      b.textContent = imp;
-      li.appendChild(b);
+    // Turn-specific note when the guess ignored something already provable.
+    const aside = missedTip(r);
+    if (aside) {
+      const a = document.createElement('div');
+      a.className = 'coach-aside';
+      a.textContent = aside;
+      li.appendChild(a);
     }
 
     ol.appendChild(li);
@@ -672,7 +624,7 @@ function renderTrainingSummary(analysis, replay) {
     lines.push('Every digit you tried was still live — no wasted slots. Clean probing.');
   } else {
     lines.push(`${analysis.slipCount} guess${analysis.slipCount === 1 ? '' : 'es'} reused a digit already proven absent — ` +
-      `those slots gave nothing. Glance at the red OUT row before committing.`);
+      `those slots gave nothing. Glance at the grey (ruled-out) digits before committing.`);
   }
 
   // Missed forced deductions (S2/S3).
@@ -684,7 +636,7 @@ function renderTrainingSummary(analysis, replay) {
   // Takeaway.
   let takeaway;
   if (analysis.slipCount > 0) {
-    takeaway = 'Takeaway: before each guess, avoid digits in the red OUT row — every one is a guaranteed dead slot.';
+    takeaway = 'Takeaway: before each guess, avoid the grey (ruled-out) digits — every one is a guaranteed dead slot.';
   } else if (analysis.freeRounds > 0) {
     takeaway = 'Takeaway: once the IN digits and locked positions pin a single number, just guess it — you’d already solved it on paper.';
   } else if (analysis.avgBits < 1.5 && analysis.sharpest) {
@@ -708,19 +660,15 @@ function renderTrainingSummary(analysis, replay) {
   el.appendChild(cmp);
 }
 
-// Final provable digit knowledge: green = in the secret, red = out, grey = unknown.
+// Final provable digit knowledge, in the same colour language as the per-turn
+// grids: green = bull (placed), yellow = cow (in code), grey = out, plain = unknown.
 function renderDigitTracker(rounds) {
   const host = document.getElementById('digit-chips');
   host.innerHTML = '';
-  const last = rounds[rounds.length - 1];
-  const inSet = new Set(last.knownIn);
-  const outSet = new Set(last.knownOut);
+  const states = classifyDigits(rounds[rounds.length - 1]);
   for (let d = 0; d <= 9; d++) {
     const chip = document.createElement('span');
-    let state = 'unknown';
-    if (inSet.has(d)) state = 'in';
-    else if (outSet.has(d)) state = 'out';
-    chip.className = 'digit-chip chip-' + state;
+    chip.className = 'dchip dchip-' + states[d];
     chip.textContent = d;
     host.appendChild(chip);
   }

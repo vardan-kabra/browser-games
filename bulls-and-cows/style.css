@@ -337,36 +337,45 @@ header p {
   margin-bottom: 8px;
 }
 
-#digit-chips {
+/* Digit knowledge grid (per-turn coaching + final tracker share this) */
+.digit-grid, #digit-chips {
   display: flex;
-  gap: 6px;
+  gap: 5px;
   flex-wrap: wrap;
 }
 
-.digit-chip {
+.digit-grid { margin: 8px 0 6px; }
+
+.dchip {
   display: inline-flex;
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
+  border-radius: 7px;
   font-weight: 700;
+  font-size: 0.85rem;
   font-variant-numeric: tabular-nums;
   border: 2px solid var(--border);
+  background: var(--bg-1);
+  color: var(--text-dim);
 }
 
-.chip-in      { background: #064e3b; border-color: var(--green); color: #6ee7b7; }
-.chip-out     { background: #450a0a; border-color: var(--red);   color: #fca5a5; }
-.chip-unknown { background: var(--bg-1); border-color: var(--border); color: var(--slate); }
+.dchip-bull    { background: #064e3b; border-color: var(--green); color: #6ee7b7; }
+.dchip-cow     { background: #451a03; border-color: var(--amber); color: #fcd34d; }
+.dchip-out     { background: #1e293b; border-color: var(--slate); color: var(--slate); text-decoration: line-through; }
+.dchip-unknown { background: var(--bg-1); border-color: var(--border); color: var(--muted); }
 
-.tracker-legend {
+.tracker-legend, .coach-legend {
   display: flex;
-  gap: 14px;
+  gap: 12px;
   flex-wrap: wrap;
   margin-top: 8px;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   color: var(--muted);
 }
+
+.coach-legend { margin: 6px 0 14px; }
 
 .lg { display: inline-flex; align-items: center; gap: 5px; }
 .lg::before {
@@ -376,33 +385,10 @@ header p {
   border-radius: 3px;
   border: 2px solid;
 }
-.lg-in::before      { background: #064e3b; border-color: var(--green); }
-.lg-out::before     { background: #450a0a; border-color: var(--red); }
+.lg-bull::before    { background: #064e3b; border-color: var(--green); }
+.lg-cow::before     { background: #451a03; border-color: var(--amber); }
+.lg-out::before     { background: #1e293b; border-color: var(--slate); }
 .lg-unknown::before { background: var(--bg-1); border-color: var(--border); }
-
-#training-rounds, #coaching-rounds {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-top: 12px;
-}
-
-#training-rounds li, #coaching-rounds li {
-  font-size: 0.88rem;
-  line-height: 1.4;
-  color: var(--text-dim);
-  padding-left: 12px;
-  border-left: 3px solid var(--border);
-}
-
-#training-rounds li.round-solved,  #coaching-rounds li.round-solved,
-#training-rounds li.round-sharp,   #coaching-rounds li.round-sharp   { border-left-color: var(--green); }
-#training-rounds li.round-good,    #coaching-rounds li.round-good    { border-left-color: var(--teal); }
-#training-rounds li.round-ok,      #coaching-rounds li.round-ok      { border-left-color: var(--violet); }
-#training-rounds li.round-confirm, #coaching-rounds li.round-confirm { border-left-color: var(--sky); }
-#training-rounds li.round-slip,    #coaching-rounds li.round-slip    { border-left-color: var(--amber); }
-#training-rounds li.round-flat,    #coaching-rounds li.round-flat    { border-left-color: var(--slate); }
 
 #turn-coaching {
   text-align: left;
@@ -418,73 +404,38 @@ header p {
   margin-bottom: 4px;
 }
 
-.coach-head { font-weight: 600; color: var(--bright); font-variant-numeric: tabular-nums; }
-
-.round-better {
-  font-size: 0.82rem;
-  color: var(--teal);
-  margin-top: 3px;
+#coaching-rounds {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 8px;
 }
 
-.round-welldone {
-  font-size: 0.82rem;
-  color: var(--green);
-  margin-top: 3px;
+.coach-round {
+  padding-left: 12px;
+  border-left: 3px solid var(--border);
 }
 
-/* Per-round grade badge */
-.grade-badge {
-  display: inline-block;
-  font-size: 0.68rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  padding: 1px 7px;
-  border-radius: 6px;
-  margin-right: 6px;
-}
-
-.grade-solved, .grade-sharp { background: #064e3b; color: #6ee7b7; }
-.grade-good    { background: #134e4a; color: #5eead4; }
-.grade-ok      { background: var(--violet-bg); color: var(--violet-text); }
-.grade-confirm { background: #0c4a6e; color: #7dd3fc; }
-.grade-slip    { background: #451a03; color: #fcd34d; }
-.grade-flat    { background: var(--border-soft); color: var(--muted); }
-
-.round-tag {
-  display: inline-block;
-  font-weight: 700;
+.coach-head {
+  font-weight: 600;
+  color: var(--bright);
+  font-size: 0.9rem;
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.1em;
-  background: var(--violet-bg);
-  color: var(--violet-text);
-  padding: 1px 8px;
-  border-radius: 6px;
-  margin-right: 4px;
 }
 
-/* Field-narrowing bar */
-.narrow-bar {
-  height: 6px;
-  background: var(--bg-1);
-  border-radius: 4px;
-  margin-top: 6px;
-  overflow: hidden;
+.coach-logic {
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--text-dim);
 }
 
-.narrow-fill {
-  height: 100%;
-  border-radius: 4px;
-  transition: width 0.3s;
+.coach-aside {
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: var(--amber);
+  margin-top: 4px;
 }
-
-.narrow-fill.grade-sharp,
-.narrow-fill.grade-solved { background: linear-gradient(90deg, var(--violet), var(--green)); }
-.narrow-fill.grade-good   { background: var(--teal); }
-.narrow-fill.grade-ok     { background: var(--violet); }
-.narrow-fill.grade-confirm{ background: var(--sky); }
-.narrow-fill.grade-slip   { background: var(--amber); }
-.narrow-fill.grade-flat   { background: var(--slate); }
 
 .solver-note {
   font-size: 0.8rem;
@@ -624,37 +575,6 @@ header p {
 }
 
 .dist-tick.you { color: var(--teal); font-weight: 700; }
-
-#debrief-tip {
-  text-align: left;
-  margin-bottom: 20px;
-}
-
-#debrief-tip p {
-  font-size: 0.85rem;
-  color: var(--text-dim);
-  line-height: 1.45;
-  margin-bottom: 8px;
-}
-
-#debrief-tip .opener-tip {
-  color: var(--violet-text);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.04em;
-}
-
-/* Per-round deductive coaching lines (training mode) */
-.round-deduction {
-  font-size: 0.82rem;
-  color: var(--muted);
-  margin-top: 3px;
-}
-
-.round-missed {
-  font-size: 0.82rem;
-  color: var(--amber);
-  margin-top: 3px;
-}
 
 .play-again-btn {
   display: block;
