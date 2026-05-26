@@ -12,6 +12,21 @@ Open the entry HTML file in a browser (double-click, or `start <file>` on Window
 
 - **Tic Tac Toe** — `tic-tac-toe.html` (single self-contained file: markup, CSS, and JS are all inline)
 - **Bulls & Cows** — `bulls-and-cows/index.html` (split into `index.html`, `style.css`, `game.js`)
+- **29 Card Game** — `card-game-29/index.html` (split into `index.html`, `style.css`, `game.js`, `cards.js`, `ai.js`)
+
+## Git / GitHub
+
+The repository is hosted on GitHub at **https://github.com/vardan-kabra/browser-games** (remote `origin`, default branch `main`).
+
+Standard workflow:
+
+```
+git add <files>
+git commit -m "message"
+git push origin main
+```
+
+Commit and push only when the user asks. After pushing, the commit is viewable at `https://github.com/vardan-kabra/browser-games/commit/<sha>`.
 
 ## Architecture
 
