@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Browser Games</title>
+<style>
+  :root {
+    --bg-1: #0f172a;
+    --bg-2: #1e1b4b;
+    --card: #1e293b;
+    --border: #334155;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --bright: #f8fafc;
+    --violet: #8b5cf6;
+    --teal: #2dd4bf;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: linear-gradient(160deg, var(--bg-1), var(--bg-2));
+    background-attachment: fixed;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 16px;
+    color: var(--text);
+  }
+  header { text-align: center; margin-bottom: 36px; }
+  header h1 {
+    font-size: 2.6rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    background: linear-gradient(90deg, var(--violet), var(--teal));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  header p { margin-top: 8px; font-size: 0.95rem; color: var(--muted); }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 20px;
+    width: 100%;
+    max-width: 760px;
+  }
+  .game-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px 22px;
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .game-card:hover {
+    transform: translateY(-4px);
+    border-color: var(--violet);
+    box-shadow: 0 12px 32px rgba(0,0,0,0.45);
+  }
+  .game-card .emoji { font-size: 2.2rem; }
+  .game-card h2 { font-size: 1.25rem; color: var(--bright); font-weight: 600; }
+  .game-card p { font-size: 0.85rem; color: var(--muted); line-height: 1.5; }
+
+  footer { margin-top: 40px; font-size: 0.8rem; color: var(--muted); }
+  footer a { color: var(--teal); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Browser Games</h1>
+    <p>A collection of self-contained, dependency-free games &mdash; just pick one and play.</p>
+  </header>
+
+  <main class="grid">
+    <a class="game-card" href="tic-tac-toe.html">
+      <span class="emoji">&#11093;&#10060;</span>
+      <h2>Tic Tac Toe</h2>
+      <p>Classic 3&times;3 grid with an easy / medium / hard CPU opponent powered by minimax.</p>
+    </a>
+
+    <a class="game-card" href="bulls-and-cows/">
+      <span class="emoji">&#129352;&#128004;</span>
+      <h2>Bulls &amp; Cows</h2>
+      <p>Crack the 4-digit secret code. Includes a full training engine with coaching and a solver replay.</p>
+    </a>
+
+    <a class="game-card" href="card-game-29/">
+      <span class="emoji">&#127183;</span>
+      <h2>29 Card Game</h2>
+      <p>The classic trick-taking trump game for four players, against the computer.</p>
+    </a>
+  </main>
+
+  <footer>
+    Source on <a href="https://github.com/vardan-kabra/browser-games" target="_blank" rel="noopener">GitHub</a>
+  </footer>
+</body>
+</html>
