@@ -26,7 +26,7 @@ git commit -m "message"
 git push origin main
 ```
 
-Commit and push only when the user asks. After pushing, the commit is viewable at `https://github.com/vardan-kabra/browser-games/commit/<sha>`.
+**Commit and push regularly as you work — don't wait to be asked.** After each meaningful, self-contained change (a feature, a fix, a refactor), `git add` the relevant files, commit with a clean descriptive message, and `git push origin main`. The goal is that work is never lost and the GitHub repo always reflects the current state. Keep commit messages clear and scoped to one logical change; avoid lumping unrelated edits together. After pushing, the commit is viewable at `https://github.com/vardan-kabra/browser-games/commit/<sha>`.
 
 ## Architecture
 
