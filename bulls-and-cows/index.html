@@ -26,7 +26,7 @@
 
     <label id="training-toggle">
       <input type="checkbox" id="training-checkbox" />
-      Training mode — get a post-win breakdown of your deductions
+      Training mode — also unlock a solver replay, digit-knowledge tracker, and info-gain stats
     </label>
 
     <section id="input-area">
@@ -50,6 +50,8 @@
       <h2>You cracked it!</h2>
       <p>Solved in <strong><span id="win-turns"></span> turns</strong></p>
 
+      <button class="play-again-btn" onclick="newGame()">Play Again</button>
+
       <div id="score-badge"></div>
       <p id="score-context"></p>
       <p id="optimal-line"></p>
@@ -66,11 +68,15 @@
         <ol id="coaching-rounds"></ol>
       </div>
 
-      <button id="new-game-btn" onclick="newGame()">Play Again</button>
+      <button class="play-again-btn play-again-bottom" onclick="newGame()">Play Again</button>
     </div>
 
     <div id="training-panel" hidden>
-      <h2>Training feedback</h2>
+      <div class="training-banner">
+        <span class="training-pill">Training mode</span>
+        <span class="training-intro">Extra analysis you unlocked with the checkbox</span>
+      </div>
+
       <div id="training-summary"></div>
 
       <div id="digit-tracker">
@@ -83,24 +89,29 @@
         </div>
       </div>
 
-      <h2>How a solver would play</h2>
-      <p class="solver-note">Same secret, starting from your first guess.</p>
-      <table id="solver-table">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Guess</th>
-            <th>Bulls</th>
-            <th>Cows</th>
-          </tr>
-        </thead>
-        <tbody id="solver-body"></tbody>
-      </table>
+      <details id="solver-details">
+        <summary>How a solver would play this secret</summary>
+        <p class="solver-note">Same secret, starting from your first guess.</p>
+        <table id="solver-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Guess</th>
+              <th>Bulls</th>
+              <th>Cows</th>
+            </tr>
+          </thead>
+          <tbody id="solver-body"></tbody>
+        </table>
+      </details>
     </div>
 
     <div id="history-header">
       <h2>Guesses</h2>
-      <span id="turn-counter">Turn 0</span>
+      <div class="history-meta">
+        <span id="turn-counter">Turn 0</span>
+        <button id="restart-btn" onclick="newGame()" title="Start a new game">New game</button>
+      </div>
     </div>
 
     <table id="history-table">

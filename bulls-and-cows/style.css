@@ -64,7 +64,20 @@ header p {
   width: 100%;
   max-width: 480px;
   padding: 24px;
+  display: flex;
+  flex-direction: column;
 }
+
+/* Source order stays readable, but on a win the result panel floats to the top
+   (order: 0) while the pre-game chrome is hidden, so nothing important is ever
+   stranded below the analysis. */
+#win-screen     { order: 0; }
+#rules          { order: 1; }
+#training-toggle{ order: 2; }
+#input-area     { order: 3; }
+#training-panel { order: 4; }
+#history-header { order: 5; }
+#history-table  { order: 6; }
 
 #rules {
   margin-bottom: 24px;
@@ -164,6 +177,12 @@ header p {
   color: var(--muted);
 }
 
+.history-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 #turn-counter {
   font-size: 0.8rem;
   font-weight: 600;
@@ -172,6 +191,21 @@ header p {
   padding: 2px 10px;
   border-radius: 20px;
 }
+
+/* Mid-game restart — lets a player bail without winning or reloading. */
+#restart-btn {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  padding: 3px 10px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+#restart-btn:hover { color: var(--text); border-color: var(--slate); }
 
 #history-table, #solver-table {
   width: 100%;
@@ -229,23 +263,55 @@ header p {
 
 #training-toggle input { accent-color: var(--violet); cursor: pointer; }
 
+/* Fenced off so it's obvious this only appeared because the checkbox was ticked. */
 #training-panel {
   margin-bottom: 24px;
-  padding-bottom: 20px;
-  border-bottom: 1px solid var(--border);
+  padding: 16px;
+  border: 1px solid var(--violet-deep);
+  border-radius: 12px;
+  background: rgba(124, 58, 237, 0.08);
 }
 
-#training-panel h2 {
+.training-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.training-pill {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #fff;
+  background: var(--violet-deep);
+  padding: 3px 10px;
+  border-radius: 20px;
+}
+
+.training-intro {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+#solver-details {
+  margin-top: 16px;
+}
+
+#solver-details summary {
   font-size: 0.75rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--muted);
-  margin-bottom: 10px;
-  margin-top: 20px;
+  color: var(--violet-text);
+  cursor: pointer;
+  padding: 4px 0;
 }
 
-#training-panel h2:first-child { margin-top: 0; }
+#solver-details summary:hover { color: var(--bright); }
+#solver-details[open] summary { margin-bottom: 6px; }
 
 #training-summary p {
   font-size: 0.9rem;
@@ -590,7 +656,9 @@ header p {
   margin-top: 3px;
 }
 
-#new-game-btn {
+.play-again-btn {
+  display: block;
+  margin: 0 auto 22px;
   padding: 12px 32px;
   background: var(--violet);
   color: #fff;
@@ -602,4 +670,7 @@ header p {
   transition: background 0.15s;
 }
 
-#new-game-btn:hover { background: var(--violet-deep); }
+.play-again-btn:hover { background: var(--violet-deep); }
+
+/* The second copy, after the full coaching list, has no content below it. */
+.play-again-bottom { margin: 8px auto 0; }

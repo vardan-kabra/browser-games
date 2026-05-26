@@ -83,7 +83,11 @@ function updateTurnCounter() {
 }
 
 function showWinScreen() {
+  // The result is the focus now — clear the pre-game chrome out of the way so the
+  // win screen floats to the top of the card (see #win-screen { order: 0 }).
   document.getElementById('input-area').hidden = true;
+  document.getElementById('rules').hidden = true;
+  document.getElementById('training-toggle').hidden = true;
   const win = document.getElementById('win-screen');
   win.hidden = false;
   document.getElementById('win-turns').textContent = turnCount;
@@ -105,6 +109,10 @@ function newGame() {
   document.getElementById('win-screen').hidden = true;
   document.getElementById('input-area').hidden = false;
   document.getElementById('training-panel').hidden = true;
+  document.getElementById('rules').hidden = false;
+  document.getElementById('training-toggle').hidden = false;
+  const solverDetails = document.getElementById('solver-details');
+  if (solverDetails) solverDetails.open = false;
   document.getElementById('guess-input').focus();
 }
 
@@ -165,9 +173,11 @@ function humanScoreForTurns(turns) {
            context: 'Lean on the elimination method — cross out every digit a 0/0 result rules out.' };
 }
 
-// The packet's optimal-solver benchmark, framed as a comparison (not the player's grade).
+// The packet's optimal-solver benchmark, stated as a plain fact — deliberately NOT
+// a second grade, so it can't contradict the human-fair label above (e.g. "Good"
+// vs the table's harsher "Below Average" for the same 7-turn game).
 function optimalComparisonLine(turns) {
-  return `vs a perfect solver (averages 5.21 turns, never exceeds 7): ${scoreForTurns(turns).context}`;
+  return `For reference, a perfect computer solver averages 5.21 turns and never needs more than 7 — you did it in ${turns}.`;
 }
 
 // Turn-banded improvement tip (from the coach prompt).
