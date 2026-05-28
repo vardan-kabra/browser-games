@@ -121,17 +121,33 @@ function newGame() {
 // "bulls cows training prompt.md"). Stats are for the 5040-code variant.
 // ---------------------------------------------------------------------------
 
-// Score / label / percentile by turns taken (8+ is the fallback row).
-const SCORING_TABLE = {
-  1: { score: 100, label: 'Miraculous',    percentile: 99.98, context: 'Only 1 in 5040 codes can be solved on the first guess. Pure luck — but extraordinary.' },
-  2: { score: 95,  label: 'Exceptional',   percentile: 99.80, context: 'Top 0.2% of all possible games. An elite first guess that dramatically narrowed the field.' },
-  3: { score: 85,  label: 'Excellent',     percentile: 98.61, context: 'Top ~1.4% of games. Superb deduction — even optimal algorithms rarely finish this fast.' },
-  4: { score: 75,  label: 'Very Good',     percentile: 84.72, context: 'Better than ~85% of all possible games. Strong, efficient play.' },
-  5: { score: 60,  label: 'Good',          percentile: 37.10, context: 'Right at the optimal average of 5.21 turns. Solid, competent play.' },
-  6: { score: 40,  label: 'Average',       percentile: 0.99,  context: 'Within the normal human range — even the best algorithms need 6 turns for ~36% of codes.' },
-  7: { score: 20,  label: 'Below Average', percentile: 0.0,   context: 'The theoretical maximum. Only ~50 codes require this many turns under optimal play.' },
-  '8+': { score: 5, label: 'Needs Practice', percentile: null, context: 'Beyond the proven maximum for optimal play. Lean on systematic elimination.' },
+// Headline metric: turns taken vs the optimal solver (avg 5.21, max 7).
+// Three bands per the spec — 1-5 = at/better than optimal average, 6-7 =
+// within optimal range, 8+ = room to improve. The per-turn supporting label
+// (Miraculous / Exceptional / ...) is from the packet's scoring_table and is
+// supporting detail only — it is explicitly NOT a 0-100 score.
+const HEADLINE_TABLE = {
+  1: { label: 'Miraculous',    context: 'Only 1 in 5040 codes can be solved on the first guess — pure magic.' },
+  2: { label: 'Exceptional',   context: 'Top 0.2% of all possible games. An elite first guess that dramatically narrowed the field.' },
+  3: { label: 'Excellent',     context: 'Top ~1.4% of games. Superb deduction — even optimal algorithms rarely finish this fast.' },
+  4: { label: 'Very Good',     context: 'Better than ~85% of all possible games. Strong, efficient play.' },
+  5: { label: 'Good',          context: 'Right at the optimal average of 5.21 turns. Solid, competent play.' },
+  6: { label: 'Average',       context: 'Within the normal human range — even the best algorithms need 6 turns for ~36% of codes.' },
+  7: { label: 'Below Average', context: 'The proven maximum for optimal play. Only ~50 codes require this many turns under perfect play.' },
 };
+const HEADLINE_FALLBACK = {
+  label: 'Much Room to Improve',
+  context: 'Beyond the proven maximum for optimal play. Lean on systematic elimination — every 0/0 result rules four digits out at once.',
+};
+
+function headlineForTurns(turns) {
+  const row = HEADLINE_TABLE[turns] || HEADLINE_FALLBACK;
+  let band, bandText, tone;
+  if (turns <= 5)      { band = '1-5'; bandText = 'at or better than optimal average'; tone = 'great'; }
+  else if (turns <= 7) { band = '6-7'; bandText = 'within optimal range';                tone = 'good'; }
+  else                 { band = '8+';  bandText = 'room to improve';                     tone = 'ok';   }
+  return { ...row, band, bandText, tone };
+}
 
 // Estimated turn distribution under optimal play (sums to 5040 games).
 const TURN_DISTRIBUTION = [
@@ -144,36 +160,7 @@ const TURN_DISTRIBUTION = [
   { turns: 7, games: 50,   percentage: 0.99 },
 ];
 
-function scoreForTurns(turns) {
-  return SCORING_TABLE[turns] || SCORING_TABLE['8+'];
-}
-
-// Human-fair score/label, anchored to human benchmarks (optimal avg 5.21,
-// intermediate elimination ~5.9, novice 7-9). A 7-turn solve is "Good", not
-// "Below Average" — the packet's table above is kept only for the vs-optimal line.
-const HUMAN_SCORING = {
-  1:  { score: 100, label: 'Miraculous', context: 'A first-guess solve — pure magic.' },
-  2:  { score: 98,  label: 'Phenomenal', context: 'All but unheard of. Stunning read.' },
-  3:  { score: 95,  label: 'Brilliant',  context: 'Outstanding deduction — among the very best possible.' },
-  4:  { score: 90,  label: 'Excellent',  context: 'Excellent, efficient play.' },
-  5:  { score: 82,  label: 'Great',      context: 'Great — right around the optimal average.' },
-  6:  { score: 74,  label: 'Very Good',  context: 'Very good — comfortably strong play.' },
-  7:  { score: 66,  label: 'Good',       context: 'Good — a solid, efficient solve.' },
-  8:  { score: 56,  label: 'Solid',      context: 'Solid — a sound result.' },
-  9:  { score: 46,  label: 'Fair',       context: 'Fair — a bit more elimination will tighten it up.' },
-  10: { score: 36,  label: 'Keep Practicing', context: 'Getting there — focus on ruling digits out faster.' },
-};
-
-function humanScoreForTurns(turns) {
-  if (HUMAN_SCORING[turns]) return HUMAN_SCORING[turns];
-  // 11+: taper from 30 down to a floor of 10.
-  return { score: Math.max(10, 30 - (turns - 10) * 6), label: 'Needs Practice',
-           context: 'Lean on the elimination method — cross out every digit a 0/0 result rules out.' };
-}
-
-// The packet's optimal-solver benchmark, stated as a plain fact — deliberately NOT
-// a second grade, so it can't contradict the human-fair label above (e.g. "Good"
-// vs the table's harsher "Below Average" for the same 7-turn game).
+// The packet's optimal-solver benchmark, stated as a plain fact.
 function optimalComparisonLine(turns) {
   return `For reference, a perfect computer solver averages 5.21 turns and never needs more than 7 — you did it in ${turns}.`;
 }
@@ -289,13 +276,15 @@ function deriveKnowledge(pool) {
 }
 
 // Walk the guess log front-to-back, tracking how the pool shrinks and what
-// each round established. Information-gain framing: probes are valued, and the
-// only flagged slip is reusing a digit already proven absent.
+// each round established. Information-gain framing: probes are valued, and a
+// known-absent digit as filler is legitimate (R11). Round 1-2 are baseline /
+// guesswork — real deduction only becomes possible from round 3 on.
 function analyzeGame(log) {
   let pool = ALL_CANDIDATES;
   let lockedAtRound = null;
-  let slipCount = 0;
-  let missedCount = 0;
+  let fillerHeavyCount = 0;   // S1 — only when truly excessive (R11-aware)
+  let missedCount = 0;        // S2 / S3
+  let probeCount = 0;         // S7 — discriminating probe in round 3+
   const rounds = [];
 
   log.forEach((entry, idx) => {
@@ -304,10 +293,16 @@ function analyzeGame(log) {
     const knowledgeBefore = deriveKnowledge(pool);
     const guessDigits = entry.guess.split('').map(Number);
 
-    // S1: digits in this guess the player could already have known were absent.
+    // Per R11, a known-absent digit in a guess is NEUTRAL filler — not a slip.
+    // It contributes zero bulls/cows by construction, so the response purely
+    // reflects the active probe digits. Only flag it when the guess is mostly
+    // filler in mid/late game (round 3+, 3+ dead digits → ≤1 active probe)
+    // AND the search space is still wide enough that an alternative existed.
     const deadSet = new Set(knowledgeBefore.knownOut);
     const reusedDeadDigits = [...new Set(guessDigits)].filter(d => deadSet.has(d));
-    if (reusedDeadDigits.length && entry.bulls !== 4) slipCount++;
+    const activeProbeCount = guessDigits.filter(d => !deadSet.has(d)).length;
+    const isFillerHeavy = round >= 3 && reusedDeadDigits.length >= 3 && poolBefore > 5;
+    if (isFillerHeavy && entry.bulls !== 4) fillerHeavyCount++;
 
     // S2: digits already proven present that this guess left out.
     const guessSet = new Set(guessDigits);
@@ -320,6 +315,12 @@ function analyzeGame(log) {
     const poolAfter = pool.length;
     const knowledgeAfter = deriveKnowledge(pool);
     if (lockedAtRound === null && poolAfter === 1) lockedAtRound = round;
+
+    // S7 — discriminating probe at the endgame: round 3+, a small pruned set
+    // (2..5), and the guess productively split it. Precision-instrument play.
+    const isProbe = round >= 3 && poolBefore >= 2 && poolBefore <= 5
+      && poolAfter < poolBefore && entry.bulls !== 4;
+    if (isProbe) probeCount++;
 
     // What this response newly established (knowledge delta) — drives the per-turn line.
     const beforeOut = new Set(knowledgeBefore.knownOut);
@@ -345,6 +346,9 @@ function analyzeGame(log) {
       fractionEliminated: poolBefore > 0 ? (poolBefore - poolAfter) / poolBefore : 0,
       infoBits: poolAfter > 0 ? Math.log2(poolBefore / poolAfter) : 0,
       reusedDeadDigits,
+      activeProbeCount,
+      isFillerHeavy,
+      isProbe,
       missedPresent,
       missedLock,
       deduction,
@@ -358,15 +362,19 @@ function analyzeGame(log) {
 
   const turnCount = log.length;
   const scored = rounds.filter(r => r.bulls !== 4 && !r.forced);
-  const sharpest = scored.reduce((best, r) => (!best || r.infoBits > best.infoBits) ? r : best, null);
+  // S6 round-weighting: rounds 1-2 are luck-dominated baseline, so a large
+  // opener elimination is NOT "sharpest probe" territory. Only consider 3+.
+  const lateRounds = scored.filter(r => r.round >= 3);
+  const sharpest = lateRounds.reduce((best, r) => (!best || r.infoBits > best.infoBits) ? r : best, null);
   const avgBits = scored.length ? scored.reduce((s, r) => s + r.infoBits, 0) / scored.length : 0;
 
   return {
     rounds,
     turnCount,
     lockedAtRound,
-    slipCount,
+    fillerHeavyCount,
     missedCount,
+    probeCount,
     sharpest,
     avgBits,
     freeRounds: lockedAtRound === null ? 0 : Math.max(0, turnCount - lockedAtRound),
@@ -425,25 +433,37 @@ function coachingLogic(r) {
   return line;
 }
 
-// S1/S2/S3: gentle nudge when a guess wasted a slot or ignored something provable.
-function missedTip(r) {
-  if (r.bulls === 4) return '';
-  const tips = [];
-  if (r.reusedDeadDigits.length) {
-    const s = r.reusedDeadDigits.length === 1;
-    tips.push(`digit${s ? '' : 's'} ${r.reusedDeadDigits.join(', ')} ${s ? 'was' : 'were'} already ruled out, `
-      + `so ${s ? 'that slot' : 'those slots'} couldn't pay off`);
+// Per-round aside: positive praise for S7 (discriminating probe), or a gentle
+// nudge for missed deductions (S1 only when filler-heavy per R11; S2, S3).
+// Returns { tone: 'praise' | 'warn', text } or null.
+function roundAside(r) {
+  if (r.bulls === 4) return null;
+  // S7 praise — endgame precision-instrument play.
+  if (r.isProbe) {
+    return {
+      tone: 'praise',
+      text: `Sharp move — a discriminating probe that split a small candidate set (${r.poolBefore} → ${r.poolAfter}). This is exactly how strong solvers play the endgame.`,
+    };
   }
+  const tips = [];
+  // S1 (R11-aware): only flag when the guess is mostly filler in mid/late game.
+  if (r.isFillerHeavy) {
+    tips.push(`${r.reusedDeadDigits.length} of these digits (${r.reusedDeadDigits.join(', ')}) were already ruled out, leaving only ${r.activeProbeCount} active probe${r.activeProbeCount === 1 ? '' : 's'} — with the search space still wide, more live digits would have learned more`);
+  }
+  // S2 — missed forced presence.
   if (r.missedPresent.length) {
     const s = r.missedPresent.length === 1;
     tips.push(`you already knew ${r.missedPresent.join(', ')} ${s ? 'was' : 'were'} in the code — this guess left ${s ? 'it' : 'them'} out`);
   }
+  // S3 — missed position lock.
   if (r.missedLock.length) {
     const s = r.missedLock.length === 1;
     tips.push(r.missedLock.map(l => `position ${l.pos + 1} was already pinned to ${l.digit}`).join('; ')
       + ` — this guess didn't place ${s ? 'it' : 'them'} there`);
   }
-  return tips.length ? 'You could have analyzed this differently: ' + tips.join('; ') + '.' : '';
+  return tips.length
+    ? { tone: 'warn', text: 'You could have analyzed this differently: ' + tips.join('; ') + '.' }
+    : null;
 }
 
 // Replay the same secret with a perfect solver, seeded with the user's first
@@ -468,28 +488,24 @@ function computerReplay(secret, firstGuess) {
 // ---------------------------------------------------------------------------
 // Win-screen debrief (shown on every win, training mode or not)
 // ---------------------------------------------------------------------------
-function scoreBand(score) {
-  if (score >= 85) return 'great';
-  if (score >= 60) return 'good';
-  if (score >= 40) return 'ok';
-  return 'low';
-}
-
+// Lead with the supporting label (big, gradient text) and the headline band
+// underneath as a tone-coloured pill. The 0-100 score has been retired — the
+// spec is explicit that the headline is turns vs benchmark, not a numeric score.
 function renderDebrief(turns) {
-  const s = humanScoreForTurns(turns);
+  const h = headlineForTurns(turns);
 
   const badge = document.getElementById('score-badge');
   badge.innerHTML = '';
-  const num = document.createElement('span');
-  num.className = 'score-num';
-  num.textContent = s.score;
   const label = document.createElement('span');
-  label.className = 'score-label score-' + scoreBand(s.score);
-  label.textContent = s.label;
-  badge.appendChild(num);
+  label.className = 'score-num';
+  label.textContent = h.label;
+  const band = document.createElement('span');
+  band.className = 'score-label score-' + h.tone;
+  band.textContent = h.bandText;
   badge.appendChild(label);
+  badge.appendChild(band);
 
-  document.getElementById('score-context').textContent = s.context;
+  document.getElementById('score-context').textContent = h.context;
   document.getElementById('optimal-line').textContent = optimalComparisonLine(turns);
 
   renderDistribution(turns);
@@ -572,12 +588,13 @@ function renderCoachingRounds(analysis) {
     logic.textContent = coachingLogic(r);
     li.appendChild(logic);
 
-    // Turn-specific note when the guess ignored something already provable.
-    const aside = missedTip(r);
+    // Turn-specific note: praise for a sharp probe, or a nudge when the guess
+    // missed something already provable.
+    const aside = roundAside(r);
     if (aside) {
       const a = document.createElement('div');
-      a.className = 'coach-aside';
-      a.textContent = aside;
+      a.className = 'coach-aside coach-aside-' + aside.tone;
+      a.textContent = aside.text;
       li.appendChild(a);
     }
 
@@ -611,20 +628,27 @@ function renderTrainingSummary(analysis, replay) {
     lines.push(`Solved in ${analysis.turnCount} turns.`);
   }
 
-  // Sharpest probe (skipped on a first-guess win — nothing to compare).
+  // Sharpest probe — round-weighted (rounds 1-2 are opener luck per the spec,
+  // so analysis.sharpest is null until round 3). Average bits is over all
+  // non-forced guesses.
   if (analysis.sharpest) {
     const s = analysis.sharpest;
-    lines.push(`Your sharpest probe was ${s.guess} in round ${s.round} — ${s.infoBits.toFixed(1)} bits, ` +
+    lines.push(`Your sharpest deductive probe was ${s.guess} in round ${s.round} — ${s.infoBits.toFixed(1)} bits, ` +
       `${Math.round(s.fractionEliminated * 100)}% of the field gone in one move.`);
     lines.push(`On average each guess gave you ${analysis.avgBits.toFixed(1)} bits of information.`);
   }
 
-  // Dead-digit slips (the only genuine inefficiency).
-  if (analysis.slipCount === 0) {
-    lines.push('Every digit you tried was still live — no wasted slots. Clean probing.');
-  } else {
-    lines.push(`${analysis.slipCount} guess${analysis.slipCount === 1 ? '' : 'es'} reused a digit already proven absent — ` +
-      `those slots gave nothing. Glance at the grey (ruled-out) digits before committing.`);
+  // S7 discriminating probes — endgame precision play, always positive.
+  if (analysis.probeCount > 0) {
+    lines.push(`You played ${analysis.probeCount} discriminating probe${analysis.probeCount === 1 ? '' : 's'} ` +
+      `in the late game — splitting a small candidate set deliberately, the way strong solvers close out.`);
+  }
+
+  // S1 (R11-aware): known-absent filler is fine; only flag the truly excessive case.
+  if (analysis.fillerHeavyCount > 0) {
+    lines.push(`${analysis.fillerHeavyCount} guess${analysis.fillerHeavyCount === 1 ? '' : 'es'} ` +
+      `leaned on 3+ already-ruled-out digits, leaving only one active probe each. ` +
+      `Filler is most useful in the endgame — when the field is wide, keep more slots live.`);
   }
 
   // Missed forced deductions (S2/S3).
@@ -635,8 +659,8 @@ function renderTrainingSummary(analysis, replay) {
 
   // Takeaway.
   let takeaway;
-  if (analysis.slipCount > 0) {
-    takeaway = 'Takeaway: before each guess, avoid the grey (ruled-out) digits — every one is a guaranteed dead slot.';
+  if (analysis.fillerHeavyCount > 0) {
+    takeaway = 'Takeaway: when the field is still wide, keep most of your slots as active probes — filler shines in the endgame, not the opener.';
   } else if (analysis.freeRounds > 0) {
     takeaway = 'Takeaway: once the IN digits and locked positions pin a single number, just guess it — you’d already solved it on paper.';
   } else if (analysis.avgBits < 1.5 && analysis.sharpest) {

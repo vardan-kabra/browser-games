@@ -433,9 +433,11 @@ header p {
 .coach-aside {
   font-size: 0.82rem;
   line-height: 1.4;
-  color: var(--amber);
   margin-top: 4px;
 }
+
+.coach-aside-warn   { color: var(--amber); }
+.coach-aside-praise { color: var(--teal); }
 
 .solver-note {
   font-size: 0.8rem;
@@ -471,14 +473,17 @@ header p {
   display: flex;
   align-items: baseline;
   justify-content: center;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 8px 12px;
   margin-bottom: 6px;
 }
 
+/* Was a 2-digit score; now holds the supporting label ("Excellent",
+   "Below Average", …) which can be up to 13 chars, so clamp the size. */
 .score-num {
-  font-size: 3rem;
+  font-size: clamp(1.6rem, 7vw, 2.4rem);
   font-weight: 800;
-  line-height: 1;
+  line-height: 1.1;
   background: linear-gradient(90deg, var(--violet), var(--teal));
   -webkit-background-clip: text;
   background-clip: text;
@@ -494,10 +499,10 @@ header p {
   border-radius: 20px;
 }
 
+/* Tone maps to the headline band: great=1-5 turns, good=6-7, ok=8+. */
 .score-great { background: #064e3b; color: #6ee7b7; }
 .score-good  { background: var(--violet-bg); color: var(--violet-text); }
 .score-ok    { background: #451a03; color: #fcd34d; }
-.score-low   { background: #450a0a; color: #fca5a5; }
 
 #score-context {
   font-size: 0.85rem;
