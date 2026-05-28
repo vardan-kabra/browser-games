@@ -49,61 +49,62 @@
   },
 
   "human_player_scoring": {
-    "description": "Score and label assigned to a human player based on how many turns they took to solve. Benchmarked against the optimal strategy distribution.",
+    "description": "Performance is expressed as TURNS TAKEN, measured against the optimal solver (average 5.21 turns, never more than 7). This is the headline metric. The per-turn scoring_table below is SUPPORTING detail only — it is NOT a 0-100 score.",
+    "headline_metric": {
+      "definition": "Turns to solve, benchmarked against the optimal solver (average 5.2131, maximum 7).",
+      "bands": [
+        { "turns": "1-5", "band": "at or better than optimal average" },
+        { "turns": "6-7", "band": "within optimal range" },
+        { "turns": "8+",  "band": "room to improve" }
+      ]
+    },
+    "percentile_note": "The `percentile` field in each scoring_table row is the OPTIMAL-PLAY-DISTRIBUTION percentile — derived from how often an optimal solver would have finished by this turn against the 5040 possible codes. It is NOT a per-user-history percentile. A per-user percentile will be added as a future feature when login lands.",
     "scoring_table": [
       {
         "turns": 1,
-        "score": 100,
         "label": "Miraculous",
         "percentile": 99.98,
         "context": "Only 1 in 5040 codes can be solved on the first guess. Pure luck — but still extraordinary."
       },
       {
         "turns": 2,
-        "score": 95,
         "label": "Exceptional",
         "percentile": 99.80,
         "context": "Top 0.2% of all possible games. Excellent first guess that dramatically narrowed the field."
       },
       {
         "turns": 3,
-        "score": 85,
         "label": "Excellent",
         "percentile": 98.61,
         "context": "Top ~1.4% of games. Superb logical deduction — even optimal algorithms rarely finish this fast."
       },
       {
         "turns": 4,
-        "score": 75,
         "label": "Very Good",
         "percentile": 84.72,
         "context": "Better than ~85% of all possible games. Strong, efficient play — well above average."
       },
       {
         "turns": 5,
-        "score": 60,
         "label": "Good",
         "percentile": 37.10,
         "context": "Right at the optimal average of 5.21 turns. Solid, competent play. The modal outcome for expert algorithms."
       },
       {
         "turns": 6,
-        "score": 40,
         "label": "Average",
         "percentile": 0.99,
         "context": "Within the normal human range. Even the best algorithms need 6 turns for ~36% of codes."
       },
       {
         "turns": 7,
-        "score": 20,
         "label": "Below Average",
         "percentile": 0.0,
         "context": "The theoretical maximum. Only ~50 codes require this many turns under an optimal strategy. Room to improve."
       },
       {
         "turns": "8+",
-        "score": 5,
-        "label": "Needs Practice",
+        "label": "Much Room to Improve",
         "percentile": null,
         "context": "Beyond the proven maximum for optimal play. Likely a random-guessing approach without elimination strategy."
       }
@@ -223,7 +224,8 @@
   "training_mode_integration": {
     "how_to_use": [
       "After each game, record the number of turns the human player took",
-      "Look up `human_player_scoring.scoring_table` by turns to get score, label, percentile, and context string",
+      "Map turns to a HEADLINE BAND via `human_player_scoring.headline_metric.bands` (1-5 / 6-7 / 8+)",
+      "Look up the supporting per-turn detail (label, optimal-play-distribution percentile, context) from `human_player_scoring.scoring_table`",
       "Display the turn distribution graph with the player's result marked",
       "Compare player's turns against `algorithm_benchmarks` to show which algorithmic tier they matched",
       "If player took ≥6 turns, show `strategy_levels.level_2_intermediate.tips` as improvement hints",
@@ -233,9 +235,9 @@
     "suggested_session_fields": {
       "game_id": "string — unique per game",
       "turns_taken": "integer",
-      "score": "integer (from scoring_table)",
-      "label": "string (from scoring_table)",
-      "percentile": "float (from scoring_table)",
+      "headline_band": "string — '1-5' | '6-7' | '8+' (from headline_metric.bands)",
+      "label": "string (from scoring_table, supporting detail)",
+      "optimal_play_distribution_percentile": "float (from scoring_table, supporting detail; not a per-user percentile)",
       "strategy_tier_matched": "string — novice / intermediate / optimal",
       "session_average_turns": "float — rolling average across session",
       "session_best": "integer — fewest turns in session"

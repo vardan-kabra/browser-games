@@ -86,6 +86,15 @@
       "conclusion": "Pick a guess (may or may not be in the pruned set) that produces DIFFERENT bulls+cows responses for each candidate. With 2 candidates, just guess one — if wrong, the other is the answer.",
       "strength": "Endgame — guarantees solution in 1-2 more turns",
       "example": "Pruned set = {3706, 3806}. Guessing 3706: if correct, 4B win. If secret was 3806, response is 3B 0C (since 7 differs from 8). Either way, solved by next turn."
+    },
+    {
+      "id": "R11_probe_guess_with_neutral_filler",
+      "name": "Probe guess using a known-absent digit as neutral filler",
+      "trigger": "Player wants to test position hypotheses for fewer than 4 digits in a single guess",
+      "conclusion": "Filling unused slots with digits already known to be absent is LEGITIMATE strategy. The known-absent digit cannot contribute bulls or cows, so the response purely reflects the active probe digits — making the response easier to interpret, not harder.",
+      "strength": "Strategic — valid at any stage of the game",
+      "example": "Player wants to test whether 6 is in position 1 and whether 3 is somewhere other than position 3. They already know 1, 5 are absent. Guessing 6235 uses 6 (probe), 2 (untested filler), 3 (probe), 5 (known-absent filler). The 5 contributes zero bulls/cows by construction, so 0B 2C cleanly indicates the response came from {6, 2, 3}.",
+      "do_not_misread_as_waste": "A guess containing a known-absent digit is NOT a wasted guess. The slot is intentionally noise-free. The only true waste is when ALL four digits are known-absent (zero active probes), or when an active digit duplicates one that's already fully resolved."
     }
   ],
 
@@ -93,10 +102,12 @@
     "description": "Patterns to detect in a player's guess history that indicate sub-optimal play. Each signal maps to a specific corrective message.",
     "signals": [
       {
-        "id": "S1_reused_eliminated_digit",
-        "detection": "Player includes a digit in their guess that has been definitively eliminated (e.g. by R1 zero-zero rule)",
-        "severity": "high",
-        "message_template": "Your guess {guess} on turn {turn} included digit {digit}, which you had already ruled out by guess {prior_turn} ({prior_guess} → 0B 0C). Always cross out eliminated digits before forming your next guess."
+        "id": "S1_known_absent_digit_in_guess",
+        "detection": "Player's guess contains a digit that has been definitively eliminated (e.g. by R1 zero-zero rule)",
+        "severity": "neutral",
+        "interpretation": "This is NOT inherently a mistake. A known-absent digit acts as a noise-free filler — it contributes zero bulls and zero cows by construction, leaving the response to be interpreted entirely from the other (active) digits in the guess. Only flag this as suboptimal if the guess contains multiple known-absent digits AND a smaller subset of active probes would have given equivalent information.",
+        "message_template_neutral": "Your guess {guess} on turn {turn} included {digit}, which you'd already ruled out. That slot acts as neutral filler — no info lost, no info gained — so the response reflects only your active probe digits. This is fine, and sometimes useful for clean discriminating probes.",
+        "message_template_only_if_excessive": "Your guess {guess} on turn {turn} used {N} known-absent digits, leaving only {M} active probes. Consider whether a guess with more active probes could have narrowed the candidate set faster."
       },
       {
         "id": "S2_missed_forced_presence",
@@ -124,11 +135,32 @@
       },
       {
         "id": "S6_good_elimination",
-        "detection": "Player's guess significantly reduced the pruned set (more than 70%)",
+        "detection": "Player's guess reduced the pruned set by more than 70% AND the guess was on round 3 or later",
+        "min_round": 3,
         "severity": "positive",
-        "message_template": "Excellent guess on turn {turn}: {guess} reduced the candidate set from {before} to {after}. Sharp information gain."
+        "message_template": "Strong deduction on turn {turn}: {guess} reduced the candidate set from {before} to {after}. That's real narrowing from the clues you'd gathered.",
+        "note_for_early_rounds": "For rounds 1-2, a large elimination is expected baseline (luck-dominated, since little prior information exists). Do NOT praise it as skill; frame it neutrally as 'opener — baseline information gathered'."
+      },
+      {
+        "id": "S7_discriminating_probe",
+        "detection": "Player's guess, combined with the response, eliminates one or more candidates from a small pruned set (<=5 candidates) — especially when the guess deliberately uses a digit in a position that tests a specific hypothesis",
+        "severity": "positive",
+        "interpretation": "Strong endgame play. The player used the guess as a precision instrument rather than as a candidate submission.",
+        "message_template": "Sharp move on turn {turn}: {guess} was a discriminating probe that split your candidate set from {before} down to {after}. This is exactly how strong solvers play the endgame."
       }
     ]
+  },
+
+  "round_weighting": {
+    "description": "How to weight praise by round. Skill in Bulls and Cows is deduction from prior responses, which only becomes possible from round 3 onward.",
+    "rounds_1_to_2": {
+      "nature": "Baseline / guesswork. Little or no prior information, so large eliminations are luck, not skill.",
+      "feedback": "Neutral. Frame as 'opener — baseline information gathered'. Do not congratulate elimination size."
+    },
+    "round_3_plus": {
+      "nature": "Deduction. The player can now use prior bulls/cows to narrow logically.",
+      "feedback": "Reserve strong praise here: intersection narrowing, position locks, exploiting 0B/0C eliminations, and discriminating probes (S7)."
+    }
   },
 
   "training_workflow": {
@@ -138,7 +170,7 @@
       "After each player guess: Apply rule R9 to compute the new pruned set based on the bulls+cows response",
       "Track inferences: Maintain three lists — confirmed_present_digits, confirmed_absent_digits, position_locks",
       "After each player guess: Apply rules R1–R8 to update these lists",
-      "Detect signals: Check each coaching signal (S1–S6) against the player's actual guess history",
+      "Detect signals: Check each coaching signal (S1–S7) against the player's actual guess history",
       "At game end: Generate a debrief that combines the scoring (from main knowledge file) with the deductive coaching signals",
       "Report format: For each turn, show (a) what the player guessed, (b) the response, (c) what could have been deduced, (d) whether the player exploited that deduction in their next guess"
     ]
@@ -161,7 +193,7 @@
       "Turns 2, 3, 4 (1209, 5209, 1205) were excellent — three guesses with overlapping digits forced the position-3=0 deduction by intersection",
       "Turn 6 (1945) was the critical breakthrough — the 0B 0C result collapsed turn 5 into a forced deduction (3 must be present)",
       "Turn 7 (3287) was strong — tested the unknown digits from {6,7,8} while including the now-confirmed 3",
-      "Turn 8 (6235) was sub-optimal: by this point the player could have already narrowed to a 2-candidate set. A guess of 3706 or 3806 directly would have ended the game in 1-2 more turns. Including 5 (already eliminated by turn 6) and 2 (consistently shown absent) wasted information",
+      "Turn 8 (6235) was reasonable in form but late in timing: the 5 acted as neutral filler (per R11 — known-absent digits contribute zero bulls/cows and don't waste information) and 6 + 3 were active probes. The real critique is timing: by this point the player could already have narrowed to a 2-candidate set, so a discriminating probe of 3706 or 3806 directly would have ended the game in 1-2 more turns",
       "Net assessment: solid mid-game (turns 1-7), one wasted move at turn 8"
     ]
   }
