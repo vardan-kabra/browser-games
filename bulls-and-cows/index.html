@@ -8,7 +8,7 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icon-192.png" />
-  <link rel="stylesheet" href="style.css?v=4" />
+  <link rel="stylesheet" href="style.css?v=5" />
 </head>
 <body>
 
@@ -64,6 +64,13 @@
         <span class="dist-title">Where you landed (optimal-play distribution)</span>
         <div id="distribution-chart"></div>
       </div>
+    </div>
+
+    <div id="training-panel" hidden>
+      <div class="training-banner">
+        <span class="training-pill">Training mode</span>
+        <span class="training-intro">Extra analysis you unlocked with the checkbox</span>
+      </div>
 
       <div id="turn-coaching">
         <h3>Turn-by-turn analysis</h3>
@@ -74,15 +81,6 @@
           <span class="lg lg-unknown">still unknown</span>
         </div>
         <ol id="coaching-rounds"></ol>
-      </div>
-
-      <button class="play-again-btn play-again-bottom" onclick="newGame()">Play Again</button>
-    </div>
-
-    <div id="training-panel" hidden>
-      <div class="training-banner">
-        <span class="training-pill">Training mode</span>
-        <span class="training-intro">Extra analysis you unlocked with the checkbox</span>
       </div>
 
       <div id="training-summary"></div>
@@ -113,6 +111,8 @@
           <tbody id="solver-body"></tbody>
         </table>
       </details>
+
+      <button class="play-again-btn play-again-bottom" onclick="newGame()">Play Again</button>
     </div>
 
     <div id="history-header">
@@ -137,7 +137,7 @@
 
   </div>
 
-  <script src="game.js?v=4"></script>
+  <script src="game.js?v=5"></script>
   <script>
     // Register the service worker so the game installs and runs offline.
     if ('serviceWorker' in navigator) {

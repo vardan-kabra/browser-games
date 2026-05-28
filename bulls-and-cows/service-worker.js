@@ -1,12 +1,12 @@
 // Offline support for the Bulls & Cows PWA.
 // Cache-first for the app shell (it's fully static), with the network used to
 // fill the cache for anything not precached. Bump CACHE when assets change.
-const CACHE = 'bullscows-v3';
+const CACHE = 'bullscows-v4';
 const ASSETS = [
   './',
   './index.html',
-  './style.css?v=4',
-  './game.js?v=4',
+  './style.css?v=5',
+  './game.js?v=5',
   './manifest.webmanifest',
   './icon-192.png',
   './icon-512.png',

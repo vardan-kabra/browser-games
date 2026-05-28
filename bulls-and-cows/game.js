@@ -1,6 +1,7 @@
 let secret = '';
 let turnCount = 0;
 let guessLog = [];        // [{ guess, bulls, cows }] — the only in-memory record of the game
+let gameOver = false;     // set when 4B is achieved; gates submitGuess and the post-win training toggle
 
 function generateSecret() {
   // 4 distinct digits from 0-9; the first digit may be 0 (5040-code variant).
@@ -31,6 +32,8 @@ function validateGuess(input) {
 }
 
 function submitGuess() {
+  if (gameOver) return;   // belt-and-suspenders: input is hidden post-win, but stop any stray submission cold
+
   const input = document.getElementById('guess-input');
   const errorMsg = document.getElementById('error-msg');
   const guess = input.value.trim();
@@ -83,25 +86,32 @@ function updateTurnCounter() {
 }
 
 function showWinScreen() {
-  // The result is the focus now — clear the pre-game chrome out of the way so the
-  // win screen floats to the top of the card (see #win-screen { order: 0 }).
+  gameOver = true;
+
+  // Clear the pre-game chrome out of the way so the win screen floats to the
+  // top of the card (see #win-screen { order: 0 }). The training-toggle stays
+  // visible so the user can flip the deep analysis on/off post-win.
   document.getElementById('input-area').hidden = true;
   document.getElementById('rules').hidden = true;
-  document.getElementById('training-toggle').hidden = true;
   const win = document.getElementById('win-screen');
   win.hidden = false;
   document.getElementById('win-turns').textContent = turnCount;
   renderDebrief(turnCount);
 
+  // Pre-render both deep-analysis blocks so toggling the checkbox is a pure
+  // visibility flip with no recompute. The panel itself is shown/hidden based
+  // on the checkbox's current state and the live-toggle handler below.
   const analysis = analyzeGame(guessLog);
-  renderCoachingRounds(analysis);                 // always shown
-  if (document.getElementById('training-checkbox').checked) renderTrainingExtras(analysis);
+  renderCoachingRounds(analysis);
+  renderTrainingExtras(analysis);
+  document.getElementById('training-panel').hidden = !document.getElementById('training-checkbox').checked;
 }
 
 function newGame() {
   secret = generateSecret();
   turnCount = 0;
   guessLog = [];
+  gameOver = false;
   document.getElementById('history-body').innerHTML = '';
   document.getElementById('turn-counter').textContent = 'Turn 0';
   document.getElementById('error-msg').textContent = '';
@@ -602,13 +612,14 @@ function renderCoachingRounds(analysis) {
   }
 }
 
-// Deep-dive extras, only when the Training checkbox is ticked.
+// Populate the deep-analysis blocks (training summary, digit tracker, solver
+// replay). Visibility of the panel itself is owned by showWinScreen() and the
+// live training-toggle handler, so this function no longer touches `hidden`.
 function renderTrainingExtras(analysis) {
   const replay = computerReplay(secret, guessLog[0].guess);
   renderTrainingSummary(analysis, replay);
   renderDigitTracker(analysis.rounds);
   renderSolverTable(replay.turns);
-  document.getElementById('training-panel').hidden = false;
 }
 
 function renderTrainingSummary(analysis, replay) {
@@ -717,6 +728,14 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('guess-input').addEventListener('keydown', e => {
     if (e.key === 'Enter') submitGuess();
     else document.getElementById('error-msg').textContent = '';
+  });
+  // Post-win live toggle: the training-panel content is pre-rendered in
+  // showWinScreen(), so flipping the checkbox is just a visibility change.
+  // Mid-game the panel stays hidden regardless — it has no meaningful content
+  // until the game ends.
+  document.getElementById('training-checkbox').addEventListener('change', e => {
+    if (!gameOver) return;
+    document.getElementById('training-panel').hidden = !e.target.checked;
   });
   newGame();
 });

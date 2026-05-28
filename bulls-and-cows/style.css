@@ -23,6 +23,11 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* The HTML `hidden` attribute is overridden by any explicit `display:` rule
+   on an id selector (higher specificity). This restores the expected behavior
+   so element.hidden = true actually hides #input-area, #training-toggle, etc. */
+[hidden] { display: none !important; }
+
 body {
   font-family: 'Segoe UI', system-ui, sans-serif;
   background: linear-gradient(160deg, var(--bg-1), var(--bg-2));
@@ -117,13 +122,17 @@ header p {
   margin-bottom: 24px;
 }
 
+/* flex-wrap + flex-basis lets the Guess button drop below the input on
+   narrow viewports (~320px) instead of overflowing. */
 .input-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
 #guess-input {
-  flex: 1;
+  flex: 1 1 200px;
+  min-width: 0;
   padding: 12px 14px;
   font-size: 1.4rem;
   font-weight: 600;
@@ -143,6 +152,7 @@ header p {
 }
 
 #guess-btn {
+  flex: 1 1 auto;
   padding: 12px 20px;
   background: var(--violet);
   color: #fff;
