@@ -1,3 +1,11 @@
+// Temporary dev-mode version badge. When bumping VERSION (V4 -> V5), also bump
+// the matching `?v=N` cache-busters on style.css / game.js in index.html AND
+// in service-worker.js (ASSETS list + CACHE name), so the visible badge doubles
+// as confirmation that fresh assets actually loaded after deploy.
+// To retire: delete this const, the #version-badge element in index.html, the
+// .version-badge CSS rule, and the DOMContentLoaded render line below.
+const VERSION = "V5";
+
 let secret = '';
 let turnCount = 0;
 let guessLog = [];        // [{ guess, bulls, cows }] — the only in-memory record of the game
@@ -58,6 +66,7 @@ function submitGuess() {
   input.focus();
 
   if (bulls === 4) {
+    statsStore.addGame({ turns: turnCount, secret });
     showWinScreen();
   }
 }
@@ -97,6 +106,7 @@ function showWinScreen() {
   win.hidden = false;
   document.getElementById('win-turns').textContent = turnCount;
   renderDebrief(turnCount);
+  renderSessionStats();
 
   // Pre-render both deep-analysis blocks so toggling the checkbox is a pure
   // visibility flip with no recompute. The panel itself is shown/hidden based
@@ -561,6 +571,42 @@ function renderDistribution(turns) {
   host.appendChild(axisRow);
 }
 
+// Session statistics — populated from statsStore (see statsStore.js). The
+// display only ever reads through getSessionStats(), so a future server-backed
+// store can replace the internals without touching this function.
+function renderSessionStats() {
+  const stats = statsStore.getSessionStats();
+  if (stats.gamesPlayed === 0) return;   // unreachable from the win-screen path, but defensive
+
+  const plural = stats.gamesPlayed === 1 ? '' : 's';
+  document.getElementById('session-header').textContent =
+    `This session: ${stats.gamesPlayed} game${plural} played`;
+  document.getElementById('session-average').textContent =
+    `Session average: ${stats.averageTurns} turns — optimal is 5.21`;
+
+  // Best/spread line: only meaningful once a second game gives the spread something to span.
+  const bestEl = document.getElementById('session-best');
+  if (stats.gamesPlayed >= 2) {
+    bestEl.textContent =
+      `Best game: ${stats.bestTurns} turns. Spread: ${stats.spread} turns (best to worst).`;
+    bestEl.hidden = false;
+  } else {
+    bestEl.hidden = true;
+  }
+
+  // Per-game pills, coloured by band (1-5 green, 6-7 amber, 8+ red).
+  const host = document.getElementById('session-games');
+  host.innerHTML = '';
+  for (const g of stats.games) {
+    const tone = g.turns <= 5 ? 'great' : g.turns <= 7 ? 'ok' : 'poor';
+    const pill = document.createElement('span');
+    pill.className = 'game-pill game-pill-' + tone;
+    pill.textContent = `#${g.gameNumber} · ${g.turns}`;
+    pill.title = `Game ${g.gameNumber} — ${g.turns} turn${g.turns === 1 ? '' : 's'}`;
+    host.appendChild(pill);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Turn-by-turn coaching (shown on EVERY win) + Training extras (toggle only)
 // ---------------------------------------------------------------------------
@@ -725,6 +771,7 @@ function renderSolverTable(turns) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('version-badge').textContent = `Bulls and Cows ${VERSION}`;
   document.getElementById('guess-input').addEventListener('keydown', e => {
     if (e.key === 'Enter') submitGuess();
     else document.getElementById('error-msg').textContent = '';

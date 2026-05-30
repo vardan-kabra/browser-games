@@ -8,13 +8,14 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icon-192.png" />
-  <link rel="stylesheet" href="style.css?v=5" />
+  <link rel="stylesheet" href="style.css?v=7" />
 </head>
 <body>
 
   <header>
     <h1>Bulls &amp; Cows</h1>
     <p>Crack the secret 4-digit number. No repeated digits.</p>
+    <span id="version-badge" class="version-badge"></span>
   </header>
 
   <div class="card">
@@ -64,6 +65,19 @@
         <span class="dist-title">Where you landed (optimal-play distribution)</span>
         <div id="distribution-chart"></div>
       </div>
+
+      <section id="session-stats">
+        <h3 id="session-header" class="stats-title"></h3>
+        <p id="session-average" class="stats-line"></p>
+        <p id="session-best"    class="stats-line"></p>
+        <div id="session-games"></div>
+        <p class="stats-footer">Stats reset if you refresh the page. Saved profiles across sessions arrive with login.</p>
+      </section>
+
+      <!-- LIFETIME-TIER PLACEHOLDER (do not build):
+           A future <section id="lifetime-stats"> will render across-all-sessions
+           stats sourced from a future statsStore.getLifetimeStats() method. The
+           three current statsStore methods stay the same; only data scope expands. -->
     </div>
 
     <div id="training-panel" hidden>
@@ -137,7 +151,8 @@
 
   </div>
 
-  <script src="game.js?v=5"></script>
+  <script src="statsStore.js?v=7"></script>
+  <script src="game.js?v=7"></script>
   <script>
     // Register the service worker so the game installs and runs offline.
     if ('serviceWorker' in navigator) {
