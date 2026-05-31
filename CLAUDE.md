@@ -61,6 +61,35 @@ The whole thing is built on **information gain**, not candidate membership — d
 
 **Performance invariant:** per-round metrics (`deriveKnowledge`, `classifyDigits`, info bits) are O(pool). Minimax (O(n²)) now runs only in `computerReplay` (training-extras solver replay, seeded by the player's turn-1 guess) — the always-on coaching no longer invokes it, so the turn-1 pool of 5040 is never run through minimax.
 
+**29 Card Game** (`card-game-29/` — `game.js` engine, `ai.js` opponent, `cards.js` deck/comparison, `index.html`, `style.css`). The most complex game here. The canonical ruleset is `card-game-29/29 Card Game Rulebook.md` (source of truth), mirrored to the player by the in-game Rules screen (see the rulebook-sync rule below).
+
+State lives in one mutable `state` object; `state.phase` (`PHASE`) drives the machine: IDLE → BIDDING → TRUMP_SELECT → DOUBLE → PLAYING → HAND_SCORING → MATCH_OVER. One human (South, seat 0) + 3 AI (East 1, North 2, West 3); fixed partnerships `TEAMS = [[0,2],[1,3]]` (N–S vs E–W). Rank J>9>A>10>K>Q>8>7 (`RANK_ORDER`); points J3/9·2/A1/10·1 (`POINT_VALUE`) = 28, plus 1 for the last trick = 29. All 8 cards dealt at once; play is counter-clockwise (`nextSeat`).
+
+- **Bidding**: the opener (dealer's right) is forced to bid ≥16 and may not pass (`isForcedOpener`); there is no all-pass redeal. `aiBid` returns a strictly-increasing raise (`currentHighBid+1`) only when confidence supports it, capped at 22, else passes. The bridge-style auction grid (`renderAuctionGrid`, columns West/North/East/South) is built from `state.bidLog`.
+- **Trump**: the declarer secretly picks a suit (or No Trump), kept hidden (`trumpRevealed=false`) until a player can't follow or a trump is played (`revealTrump`); the declarer may not lead the concealed trump. The left-panel indicator card (`renderTrumpIndicator`) is face-down while concealed, the 3-of-suit face-up on reveal.
+- **Marriage** (K+Q of trump; `checkForMarriage`/`declareMarriage`): only after trump is revealed AND the declaring side has won a trick; shifts the card-point target ±4 (floor 15 / cap 29), never the scoring tier.
+- **Scoring** (`finishHand`, `bidTier`): tiers by *declared* bid — 16–20:±1, 21–27:±2, 28–29:±3 — applied to the bidding team only; the match is cumulative to ±6 (`matchOver`, `MATCH_TARGET`).
+- **Double / Redouble** (`beginDoubleWindow`, `state.stakeMultiplier` ∈ {1,2,4}): a window before the first trick — defenders may double, bidders redouble — multiplying the game-point swing. AI heuristics: `aiShouldDouble`/`aiShouldRedouble`.
+- **Single Hand** (solo ±6): `declareSingleHand`; the partner sits out so only 3 seats play (`activeSeats`/`nextActiveSeat`/`trickSize`), trump is open from the start, the declarer leads. Scored in `finishSingleHand` (+6 for all 8 tricks, else −6) and **ends the instant a defender wins a trick** (early-termination in `resolveTrick`). The AI declares it only on a monster hand (`aiShouldSingleHand` — long J+9 trump + high points).
+- **Claim / Give Up**: `claimHolds` is a depth-capped double-dummy solver — a **solo** claim holds iff the claiming seat wins *every* remaining trick by itself (you can't claim your partner's tricks). `awardRemaining(toTeam)` powers both Claim (claimant's team) and the human-only **Give Up** (opponents); it merges the in-flight trick back into hands so all seats show equal counts.
+- **End-of-hand review**: `state.dealtHands` snapshots the deal; at hand end `concludeHand` (no dark backdrop) opens every seat's ORIGINAL 8 cards face-up (`state.reviewMode='original'`); claimed/conceded hands first show the cards still held (`'remaining'`) for ~2.5s. The match-end scorecard is `renderHistoryTable` from `state.handHistory`.
+- **Deck**: cards render via the **CardMeister** custom element (`createCardEl`/`cardCid` → `<playing-card cid="8S">`), loaded from `elements.cardmeister.full.js` — crisp, bold, fully offline (data-URI SVG, works on `file://`).
+- **Layout**: a fixed 800×600 landscape table (toolbar + felt + left status panel + right Need/Taken scoreboard) scaled to any viewport by `fitToViewport()` (load + resize). Inline `onclick`/global functions, so handlers must stay in global scope.
+
+## Card Game 29 — Conventions
+
+**Rulebook sync (IMPORTANT):** whenever you change any Card Game 29 rule, scoring, or contract logic, update BOTH the canonical `card-game-29/29 Card Game Rulebook.md` (source of truth) AND the in-game Rules screen (`RULES_HTML` in `game.js`, three tabs: Basic Play / Rules & Scoring / Bidding & Contracts) so the player-facing rulebook never drifts from the code.
+
+**Cache-busting:** `index.html` loads scripts with `?v=N`; bump it when you change `game.js`/`ai.js`/`cards.js`/`style.css` so browsers refetch. The root `service-worker.js` is **network-first** (CACHE `browser-games-v2`) so the online (GitHub Pages) build updates immediately for players; bump CACHE if you ever need to force-purge.
+
+**Verification:** raster screenshots of the heavy card DOM time out, so verify by driving the page via DOM/state inspection rather than screenshots.
+
+## Backlog / Revisit later
+
+- **Double/Redouble is too swingy** — a redoubled tier-2 hand is ±8, which can end a ±6 match in a single hand; revisit the stakes and/or how eagerly the AI doubles/redoubles (`aiShouldDouble`/`aiShouldRedouble`).
+- **AI Single-Hand threshold** (`aiShouldSingleHand`) is hand-tuned (long J+9 trump + points ≥ 11 + 6 top cards); revisit against real play.
+- **Mobile portrait** — currently scale-to-fit (small on a portrait phone); a portrait-specific layout is a possible future redesign.
+
 ## Bulls and Cows — Training Mode Context
 
 You are the training coach for a Bulls and Cows game (4-digit secret, distinct digits, 0-9).

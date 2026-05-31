@@ -12,23 +12,26 @@
   --black: #111;
 }
 
-/* ── Centering shell ────────────────────────────────────────────────────────── */
+/* ── Responsive shell ───────────────────────────────────────────────────────── */
 html, body {
   width: 100%; height: 100%;
-  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;              /* the game is scaled to fit; no page scroll */
   background: #0a3520;
   font-family: 'Segoe UI', system-ui, sans-serif;
 }
 
+/* Fixed 800×600 internal layout, scaled to the viewport by fitToViewport() (game.js). */
 #game-root {
   width: 800px; height: 600px;
+  position: absolute; top: 50%; left: 50%;
+  transform-origin: center;
+  transform: translate(-50%,-50%);   /* JS appends scale(...) to fit the screen */
   background: var(--table-dark);
   display: flex; flex-direction: column;
   overflow: hidden;
   border-radius: 12px;
   box-shadow: 0 16px 64px rgba(0,0,0,0.6);
   color: #f0f0f0;
-  position: relative;
 }
 
 /* ── Top toolbar ─────────────────────────────────────────────────────────────── */

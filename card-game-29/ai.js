@@ -43,14 +43,15 @@ function aiBid(hand, currentHighBid) {
  */
 function aiShouldSingleHand(hand) {
   if (!hand || hand.length < 8) return false;
-  let hasJ9 = false;
-  for (const suit of SUITS) {
-    const sc = hand.filter(c => c.suit === suit);
-    if (sc.some(c => c.rank === 'J') && sc.some(c => c.rank === '9')) hasJ9 = true;
-  }
-  const handPts  = hand.reduce((s, c) => s + POINT_VALUE[c.rank], 0);
-  const topCards = hand.filter(c => c.rank === 'J' || c.rank === '9' || c.rank === 'A').length;
-  return hasJ9 && handPts >= 10 && topCards >= 5;
+  // Winning all 8 tricks alone (1-v-2) needs a monster: a suit with BOTH the Jack and
+  // Nine AND at least 5 cards (dominant trump control), a top-heavy hand, and high points.
+  const dominantTrump = SUITS.some(s => {
+    const sc = hand.filter(c => c.suit === s);
+    return sc.length >= 5 && sc.some(c => c.rank === 'J') && sc.some(c => c.rank === '9');
+  });
+  const handPts  = hand.reduce((sum, c) => sum + POINT_VALUE[c.rank], 0);
+  const topCards = hand.filter(c => ['J', '9', 'A', '10'].includes(c.rank)).length;
+  return dominantTrump && handPts >= 11 && topCards >= 6;
 }
 
 // ── AI: Double / Redouble (§7) ─────────────────────────────────────────────────

@@ -597,7 +597,15 @@ function resolveTrick() {
   setStatus(`${seatName(winner)} wins the trick (+${pts} pts). Trick ${state.trickCount}/8`);
   updateTrickArea();
   renderInfo();
-  renderInfo();
+
+  // Single Hand (§9): the declarer must win ALL tricks, so the instant a defender takes
+  // one the contract is broken — end the hand now instead of playing on.
+  if (state.isSingleHand && winner !== state.soloSeat) {
+    setStatus(`${seatName(winner)} takes a trick — Single Hand is broken!`);
+    if (advanceTimeout !== null) { clearTimeout(advanceTimeout); advanceTimeout = null; }
+    setTimeout(finishHand, 1300);
+    return;
+  }
 
   // A side's Marriage window opens once it has won a trick (post-reveal).
   setTimeout(checkForMarriage, 250);
@@ -1189,6 +1197,16 @@ function renderRules() {
   if (body) body.innerHTML = RULES_HTML[rulesTab];
 }
 
+// ── Responsive scaling ─────────────────────────────────────────────────────────
+
+// Scale the fixed 800×600 table to fit any screen (phone → iPad), preserving aspect ratio.
+function fitToViewport() {
+  const s = Math.min(window.innerWidth / 800, window.innerHeight / 600);
+  const root = document.getElementById('game-root');
+  if (root) root.style.transform = `translate(-50%,-50%) scale(${s})`;
+}
+window.addEventListener('resize', fitToViewport);
+
 // ── Boot ──────────────────────────────────────────────────────────────────────
 
-document.addEventListener('DOMContentLoaded', startMatch);
+document.addEventListener('DOMContentLoaded', () => { fitToViewport(); startMatch(); });
