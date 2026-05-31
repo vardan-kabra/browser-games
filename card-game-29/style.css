@@ -202,7 +202,7 @@ html, body {
 .card.trump-card { box-shadow: 0 0 0 2px #fde047; }
 .card.playable   { cursor: pointer; box-shadow: 0 0 0 2px #4ade80; }
 .card.playable:hover { transform: translateY(-7px); box-shadow: 0 8px 18px rgba(0,0,0,0.4), 0 0 0 2px #4ade80; }
-.card.unplayable { opacity: 0.38; }
+.card.unplayable { opacity: 0.62; }   /* still readable — just de-emphasised vs. legal plays */
 
 /* ── Center area (trick zone) ───────────────────────────────────────────────── */
 #center-area {
@@ -261,6 +261,11 @@ html, body {
 .btn-secondary { background: #334155; color: #e2e8f0; }
 .btn-secondary:hover { background: #475569; }
 .bid-actions { display: flex; justify-content: center; gap: 8px; }
+/* Compact one-row stepper + action buttons inside the bidding panel */
+.bid-action-row {
+  display: flex; flex-wrap: wrap; justify-content: center; align-items: center;
+  gap: 6px; margin: 6px 0;
+}
 .single-hand-row { margin-top: 10px; }
 /* Single Hand is the least-likely option — a small secondary link, not a big bar */
 .btn-shlink { background: none; border: none; color: #fb923c; font-size: 0.72rem; text-decoration: underline; cursor: pointer; padding: 2px 4px; }
@@ -324,7 +329,7 @@ html, body {
 
 /* Match over */
 #match-winner-text { font-size: 1.25rem; font-weight: 700; color: #fde047; margin-bottom: 6px; }
-.panel-card-wide { max-width: 620px; width: 94%; }
+.panel-card-wide { max-width: 480px; width: 86%; }   /* narrower so the side hands stay visible */
 #match-history { max-height: 320px; overflow-y: auto; margin: 10px 0 16px; }
 .history-table { width: 100%; border-collapse: collapse; font-size: 0.72rem; }
 .history-table th, .history-table td { padding: 4px 6px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.08); white-space: nowrap; }
@@ -373,9 +378,12 @@ html, body {
   /* table reflow: thin side columns, taller North/South bands */
   #table {
     grid-template-columns: 15vw 1fr 15vw;
-    grid-template-rows: 22vw 1fr 26vw;
-    padding: 1.5vw; gap: 1vw;
+    grid-template-rows: 22vw 1fr 28vw;     /* extra space so the South fan isn't clipped at the bottom */
+    padding: 1.5vw 1.5vw 3vw 1.5vw;
+    gap: 1vw;
   }
+  /* push the South fan up off the screen edge so the bottom-right indices are visible */
+  #seat-human { padding-bottom: 2vw; justify-content: flex-end; }
   #center-area { width: 46vw; height: 46vw; }
   .trick-slot { width: 14vw; height: 20.3vw; }
 
@@ -386,13 +394,24 @@ html, body {
   .player-label { font-size: 2.3vw; }
   #trump-indicator { gap: 1.5vw; margin-top: 1.5vw; }
 
-  /* modals & overlays fit the narrow width and clear the toolbar */
+  /* Popups confined to the central play area so W/E hands and the toolbar stay visible.
+     Width ≈ centre column (≈68vw), height capped well below 100vh, internal scroll. */
   .overlay-panel { top: 7vw; }
-  .panel-card, .panel-card-compact, .panel-card-wide { max-width: 92vw; width: 92vw; padding: 4vw; }
-  .auction-table, #rules-body, .history-table { font-size: 3vw; }
-  .btn { font-size: 3.4vw; padding: 2.4vw 5vw; }
-  .step-btn { width: 9vw; height: 9vw; font-size: 5vw; }
-  #bid-amount { width: 16vw; font-size: 5vw; }
+  .panel-card { max-width: 68vw; width: 68vw; padding: 2.6vw 3vw; max-height: 56vh; }
+  .panel-card-compact { max-width: 68vw; width: 68vw; padding: 2.6vw 3vw; }
+  .panel-card-wide { max-width: 80vw; width: 80vw; padding: 3vw; }
+  .panel-card h2 { font-size: 3.6vw; margin-bottom: 1.5vw; }
+  .panel-card p  { font-size: 2.8vw; margin-bottom: 2vw; }
+  .auction-table, #rules-body, .history-table { font-size: 2.6vw; }
+  .auction-table th, .auction-table td { padding: 0.6vw 1vw; }
+  #auction-grid { margin-bottom: 1.5vw; }
+  .btn { font-size: 3vw; padding: 1.8vw 3.6vw; border-radius: 1.6vw; }
+  .step-btn { width: 8vw; height: 8vw; font-size: 4.4vw; border-radius: 1.4vw; }
+  #bid-amount { width: 12vw; font-size: 4vw; padding: 0.6vw; border-radius: 1.4vw; }
+  .bid-action-row { gap: 1.2vw; margin: 1vw 0; }
+  .single-hand-row { margin-top: 1vw; }
+  .btn-shlink { font-size: 2.6vw; }
+  .bid-hint { font-size: 2.6vw; }
 
   /* floating chips, banners, arrow */
   #action-chips { right: 2vw; bottom: 28vw; gap: 1.5vw; }

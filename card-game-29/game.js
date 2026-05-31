@@ -279,10 +279,10 @@ function bidStep() {
   if (isHuman(seat)) {
     const cb = state.highBid;
     const msg = {
-      'open':          'You open — bid 16 or declare Single Hand.',
-      'slot-open':     `High bid ${cb} by ${seatName(state.highBidder)}. Challenge, pass, or Single Hand.`,
-      'vs-holder':     `${seatName(state.challenger)} challenged at ${cb}. Hold (match), raise, pass, or Single Hand.`,
-      'vs-challenger': `You're challenging at ${cb}. Raise, pass, or Single Hand.`,
+      'open':          'You open — bid 16 or Single Hand.',
+      'slot-open':     `Bid ${cb} by ${seatName(state.highBidder)} — your move.`,
+      'vs-holder':     `${seatName(state.challenger)} challenged at ${cb} — your move.`,
+      'vs-challenger': `Challenging at ${cb} — your move.`,
     }[state.bidStage];
     setStatus(msg);
   } else {
@@ -1099,33 +1099,31 @@ function renderBiddingPanel() {
   if (!myTurn || !ctrls) return;
 
   const cb = state.highBid, canRaise = cb < 29;
+  // Compact stepper sits INLINE with the action buttons (one row), so the panel is wider+shorter.
   const stepper = (min) =>
-    `<div id="bid-row">
-       <button class="step-btn" onclick="stepBid(-1)">−</button>
-       <input id="bid-amount" type="number" min="${min}" max="29" value="${min}" readonly>
-       <button class="step-btn" onclick="stepBid(1)">+</button>
-     </div>`;
-  const sh = `<div class="single-hand-row"><button class="btn-shlink" onclick="humanBidAction('sh')">Single Hand (solo ±6)</button></div>`;
+    `<button class="step-btn" onclick="stepBid(-1)">−</button>
+     <input id="bid-amount" type="number" min="${min}" max="29" value="${min}" readonly>
+     <button class="step-btn" onclick="stepBid(1)">+</button>`;
+  const sh = `<button class="btn-shlink" onclick="humanBidAction('sh')">Single Hand (solo ±6)</button>`;
 
-  let html;
+  let row;   // the action row contents (stepper + buttons inline)
   if (state.bidStage === 'open') {
-    html = `<p class="bid-hint">You open the auction.</p>
-      <div class="bid-actions"><button class="btn btn-primary" onclick="humanBidAction('open16')">Open at 16</button></div>${sh}`;
-  } else if (state.bidStage === 'vs-holder') {     // human is the holder, defending
-    html = `<div class="bid-actions">
-        <button class="btn btn-primary" onclick="humanBidAction('match')">Hold at ${cb}</button>
-        ${canRaise ? `<button class="btn btn-secondary" onclick="humanRaise()">Raise</button>` : ''}
-        <button class="btn btn-secondary" onclick="humanBidAction('pass')">Pass</button>
-      </div>${canRaise ? stepper(cb + 1) : ''}${sh}`;
-  } else {                                          // slot-open or vs-challenger: human is the challenger
+    row = `<button class="btn btn-primary" onclick="humanBidAction('open16')">Open at 16</button>`;
+  } else if (state.bidStage === 'vs-holder') {       // human is the holder, defending
+    row = `<button class="btn btn-primary" onclick="humanBidAction('match')">Hold at ${cb}</button>
+           ${canRaise ? stepper(cb + 1) : ''}
+           ${canRaise ? `<button class="btn btn-secondary" onclick="humanRaise()">Raise</button>` : ''}
+           <button class="btn btn-secondary" onclick="humanBidAction('pass')">Pass</button>`;
+  } else {                                            // slot-open or vs-challenger: human is the challenger
     const label = state.bidStage === 'slot-open' ? 'Challenge' : 'Raise';
-    html = `${canRaise ? stepper(cb + 1) : '<p class="bid-hint">Already at the 29 cap — Single Hand or pass.</p>'}
-      <div class="bid-actions">
-        ${canRaise ? `<button class="btn btn-primary" onclick="humanRaise()">${label}</button>` : ''}
-        <button class="btn btn-secondary" onclick="humanBidAction('pass')">Pass</button>
-      </div>${sh}`;
+    row = canRaise
+      ? `${stepper(cb + 1)}
+         <button class="btn btn-primary" onclick="humanRaise()">${label}</button>
+         <button class="btn btn-secondary" onclick="humanBidAction('pass')">Pass</button>`
+      : `<span class="bid-hint">At the 29 cap — Single Hand or pass.</span>
+         <button class="btn btn-secondary" onclick="humanBidAction('pass')">Pass</button>`;
   }
-  ctrls.innerHTML = html;
+  ctrls.innerHTML = `<div class="bid-action-row">${row}</div><div class="single-hand-row">${sh}</div>`;
 }
 
 // Nudge the human's pending bid within [min, 29] (min taken from the input).
