@@ -111,7 +111,8 @@ let state = {
   isSingleHand:    false,    // solo ±6 contract
   soloSeat:        null,     // the lone declarer in a Single Hand
   tricksWonBy:     [0, 0],   // trick counts per team (for Marriage trick-gating)
-  revealAllHands:  false,    // flip every hand face-up (claim accepted / hand review)
+  dealtHands:      [[], [], [], []],   // each seat's ORIGINAL 8 cards (for end-of-hand review)
+  reviewMode:      null,     // null | 'remaining' (claim preview) | 'original' (open all hands)
 
   // Play
   tricks:           [],
@@ -183,10 +184,13 @@ function startHand() {
   hideMarriagePrompt();
   show('hand-result-panel', false);
   show('match-over-panel', false);
+  show('claim-btn', false);
+  show('giveup-btn', false);
   hideRevealBanner();
   state.dealer = nextSeat(state.dealer);
   const deck = shuffle(buildDeck());
   state.hands = dealHands(deck);
+  state.dealtHands = state.hands.map(h => h.map(c => ({ ...c })));   // snapshot for review
 
   state.passed         = [false, false, false, false];
   state.currentBidder  = nextSeat(state.dealer);
@@ -206,7 +210,7 @@ function startHand() {
   state.isSingleHand   = false;
   state.soloSeat       = null;
   state.tricksWonBy    = [0, 0];
-  state.revealAllHands = false;
+  state.reviewMode     = null;
   state.tricks         = [];
   state.currentTrick   = [];
   state.trickPoints    = [0, 0];
@@ -464,10 +468,12 @@ function advancePlay() {
 
   if (isHuman(state.activePlayer)) {
     renderHand(0);
-    // Human may claim on their turn, but not with a single trick left (§8).
-    show('claim-btn', !isSittingOut(0) && tricksRemaining() >= 2);
+    const canAct = !isSittingOut(0);
+    show('claim-btn', canAct && tricksRemaining() >= 2);   // claim needs ≥2 tricks (§8)
+    show('giveup-btn', canAct);                            // give up available any turn
   } else {
     show('claim-btn', false);
+    show('giveup-btn', false);
     setTimeout(doAIPlay, AI_DELAY_MS);
   }
 }
@@ -675,10 +681,10 @@ function onClaimRejectOk() {
   renderHand(0);                          // restore clickable hand
 }
 
-// A solo claim by `claimSeat`: that seat wins every remaining trick, so all
-// remaining card points and tricks go to its team. Then score the hand.
-function acceptClaim(claimSeat) {
-  const claimTeam = teamOf(claimSeat);
+// Award every remaining trick + card-point to `toTeam`, merge the in-flight trick back
+// into hands so all seats show equal counts, then run the end-of-hand sequence.
+// Used by both Claim (toTeam = claimant's team) and Give Up (toTeam = opponents).
+function awardRemaining(toTeam, banner) {
   const seats = activeSeats();
   let pts = 0, remainingCards = state.currentTrick.length;
   for (const s of seats) {
@@ -688,18 +694,37 @@ function acceptClaim(claimSeat) {
   for (const t of state.currentTrick) pts += POINT_VALUE[t.card.rank];
   const tricksLeft = Math.round(remainingCards / seats.length);
 
-  state.trickPoints[claimTeam] += pts;
-  state.tricksWonBy[claimTeam] += tricksLeft;
-  state.lastTrickWinner = claimSeat;
+  state.trickPoints[toTeam] += pts;
+  state.tricksWonBy[toTeam] += tricksLeft;
+  state.lastTrickWinner = seats.find(s => teamOf(s) === toTeam);
   state.trickCount = 8;
+
+  // Put the in-flight trick back so every active seat shows the same number of cards.
+  for (const t of state.currentTrick) state.hands[t.playerIndex].push(t.card);
+  state.currentTrick = [];
   if (advanceTimeout !== null) { clearTimeout(advanceTimeout); advanceTimeout = null; }
 
-  // Announce the claim on the status line; finishHand() runs the reveal→banner→score
-  // sequence (which flips all hands face-up so the claim is clear).
   show('claim-btn', false);
+  show('giveup-btn', false);
   hideMarriagePrompt();
-  setStatus(`★ ${seatName(claimSeat)} claims the remaining ${tricksLeft} tricks — accepted!`);
+  pendingClaimBanner = banner;     // concludeHand shows this during the reveal
   finishHand();
+}
+
+// A solo claim by `claimSeat` — that seat wins every remaining trick by itself.
+function acceptClaim(claimSeat) {
+  const t = tricksRemaining();
+  awardRemaining(teamOf(claimSeat),
+    `★ ${seatName(claimSeat)} claims the remaining ${t} ${t === 1 ? 'trick' : 'tricks'} — accepted!`);
+}
+
+// Human concedes: the opposing team takes every remaining trick.
+function onGiveUp() {
+  if (state.phase !== PHASE.PLAYING || !isHuman(state.activePlayer)) return;
+  const toTeam = 1 - teamOf(0);
+  const t = tricksRemaining();
+  awardRemaining(toTeam,
+    `🏳 South gives up — ${TEAM_NAMES[toTeam]} take the remaining ${t} ${t === 1 ? 'trick' : 'tricks'}.`);
 }
 
 // ── Hand scoring ──────────────────────────────────────────────────────────────
@@ -714,6 +739,7 @@ function matchOver() {
 
 function finishHand() {
   show('claim-btn', false);
+  show('giveup-btn', false);
   // Single Hand (§9) is a solo ±6 contract scored separately.
   if (state.isSingleHand) { finishSingleHand(); return; }
 
@@ -767,15 +793,37 @@ function hideRevealBanner() {
   if (b) b.hidden = true;
 }
 
-// End-of-hand sequence (§F): flip all hands face-up, show a banner for ~2.5s while the
-// cards are fully visible, THEN show the result / scorecard panel — never covering
-// un-revealed cards.
-function concludeHand(bannerText, showPanel) {
-  state.revealAllHands = true;
+let pendingClaimBanner = null;   // set by a claim/give-up so concludeHand shows it first
+
+function renderReview() {
   for (let i = 0; i < 4; i++) renderHand(i);
+  updateTrickArea();   // centre is empty during review (played cards are back in hand)
   renderInfo();
-  showRevealBanner(bannerText);
-  setTimeout(() => { hideRevealBanner(); showPanel(); }, 2500);
+}
+
+// End-of-hand sequence. No backdrop, so cards stay visible throughout.
+//  • Claimed / conceded: Phase 1 (~2.5s) opens the cards STILL HELD with the claim banner
+//    so the player sees what was taken; Phase 2 opens every seat's ORIGINAL 8 cards + panel.
+//  • Natural hand: straight to Phase 2 (original hands) with the result banner, then the panel.
+function concludeHand(resultBanner, showPanel) {
+  const claimBanner = pendingClaimBanner;
+  pendingClaimBanner = null;
+  if (claimBanner) {
+    state.reviewMode = 'remaining';
+    renderReview();
+    showRevealBanner(claimBanner);
+    setTimeout(() => {
+      state.reviewMode = 'original';
+      renderReview();
+      hideRevealBanner();
+      showPanel();
+    }, 2600);
+  } else {
+    state.reviewMode = 'original';
+    renderReview();
+    showRevealBanner(resultBanner);
+    setTimeout(() => { hideRevealBanner(); showPanel(); }, 2500);
+  }
 }
 
 // ── Rendering ─────────────────────────────────────────────────────────────────
@@ -858,34 +906,32 @@ function renderTrumpIndicator() {
   slot.appendChild(createCardEl({ rank: '3', suit: state.trumpSuit }, state.trumpRevealed));
 }
 
-// Green arrow near the centre pointing at the seat to act.
+// Green "your turn" arrow — shown ONLY on the human's turn, just above the South hand.
 function renderTurnArrow() {
   const arrow = document.getElementById('turn-arrow');
   if (!arrow) return;
-  if (state.phase !== PHASE.PLAYING || isSittingOut(state.activePlayer)) { arrow.hidden = true; return; }
+  const yourTurn = state.phase === PHASE.PLAYING && state.activePlayer === 0 && !isSittingOut(0);
+  if (!yourTurn) { arrow.hidden = true; return; }
   arrow.hidden = false;
-  const pos = {
-    0: { left: '50%', top: '64%', rot: 0   },   // South — point down
-    1: { left: '60%', top: '50%', rot: -90 },   // East  — point right
-    2: { left: '50%', top: '34%', rot: 180 },   // North — point up
-    3: { left: '40%', top: '50%', rot: 90  },   // West  — point left
-  }[state.activePlayer];
-  arrow.style.left = pos.left;
-  arrow.style.top  = pos.top;
-  arrow.style.transform = `translate(-50%,-50%) rotate(${pos.rot}deg)`;
+  arrow.style.left = '50%';
+  arrow.style.top  = '78%';
+  arrow.style.transform = 'translate(-50%,-50%) rotate(0deg)';   // point down at your hand
 }
 
 function renderHand(seat) {
   const el = document.getElementById(`hand-${seat}`);
   if (!el) return;
   el.innerHTML = '';
-  const sorted  = sortHand(state.hands[seat]);
+  // Review modes (end of hand): 'original' opens every seat's ORIGINAL 8 cards;
+  // 'remaining' opens the cards still held (claim/give-up preview). Otherwise normal play.
+  const reviewing = state.reviewMode === 'original' || state.reviewMode === 'remaining';
+  const source  = state.reviewMode === 'original' ? (state.dealtHands[seat] || []) : state.hands[seat];
+  const sorted  = sortHand(source);
   const ledSuit = state.currentTrick.length ? state.currentTrick[0].card.suit : null;
-  // The human's own cards are face-up — unless they are the Single Hand partner
-  // sitting out. When revealAllHands is set (claim accepted / hand review) every
-  // hand is shown face-up.
-  const faceUp  = state.revealAllHands || (seat === 0 && !isSittingOut(0));
-  let legal     = (seat === 0 && !isSittingOut(0) && !state.revealAllHands &&
+  // The human's own cards are face-up — unless they are the Single Hand partner sitting
+  // out. During review every hand is face-up.
+  const faceUp  = reviewing || (seat === 0 && !isSittingOut(0));
+  let legal     = (!reviewing && seat === 0 && !isSittingOut(0) &&
                    state.phase === PHASE.PLAYING && isHuman(state.activePlayer))
     ? legalPlays(state.hands[0], ledSuit) : [];
   // Declarer may not lead the concealed trump — grey those cards out (§4).

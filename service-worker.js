@@ -1,8 +1,8 @@
 // Offline support for the "Browser Games" collection PWA (whole-site scope).
-// Precaches the landing page; everything else (each game's files) is cached
-// at runtime as you visit it, so games you've opened once work offline too.
-// Bump CACHE when the landing page or icons change.
-const CACHE = 'browser-games-v1';
+// NETWORK-FIRST: always try the network so updates reach players immediately, and
+// fall back to the runtime cache only when offline. Precaches the landing page.
+// Bump CACHE whenever you want to force-purge old caches.
+const CACHE = 'browser-games-v2';
 const CORE = [
   './',
   './index.html',
@@ -29,11 +29,14 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
+  // Network-first: fetch fresh, cache a copy, fall back to cache (then landing page) offline.
   event.respondWith(
-    caches.match(event.request).then(hit => hit || fetch(event.request).then(res => {
+    fetch(event.request).then(res => {
       const copy = res.clone();
       caches.open(CACHE).then(cache => cache.put(event.request, copy));
       return res;
-    }).catch(() => caches.match('./index.html')))
+    }).catch(() =>
+      caches.match(event.request).then(hit => hit || caches.match('./index.html'))
+    )
   );
 });

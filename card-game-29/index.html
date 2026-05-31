@@ -15,6 +15,7 @@
   <!-- ── Top toolbar ──────────────────────────────────────────────────────── -->
   <div id="top-toolbar">
     <span id="app-title">29</span>
+    <span id="status-msg"></span>
     <div id="toolbar-icons">
       <button class="tb-btn" title="Scorecard" onclick="onShowScorecard()">🗒</button>
       <button class="tb-btn" title="How to play" onclick="onShowRules()">?</button>
@@ -90,9 +91,9 @@
 
   </div><!-- #table -->
 
-    <!-- Status line -->
-    <div id="status-bar">
-      <span id="status-msg"></span>
+    <!-- Floating action chips (shown on the human's turn) -->
+    <div id="action-chips">
+      <button id="giveup-btn" onclick="onGiveUp()" hidden>Give Up</button>
       <button id="claim-btn" onclick="onClaim()" hidden>Claim</button>
     </div>
 
