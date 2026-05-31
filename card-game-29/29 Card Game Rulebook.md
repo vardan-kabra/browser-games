@@ -32,17 +32,18 @@
 
 ---
 
-## 3. Bidding
+## 3. Bidding (asymmetric holder-match model)
 
-- Bidding happens **after** each player has seen their full 8-card hand.
-- The **opening bidder is the player to the dealer's right**. They are **forced to open at the minimum bid of 16** and may **not** pass.
-- Play proceeds counter-clockwise. Each subsequent player may **raise** (bid higher than the current bid) or **pass**. A pass eliminates that player from the auction.
-- Bids ascend only. **Range: 16 to 29.**
-- **Single Hand** sits above 29 as the top of the ladder (see §9).
-- The **highest bidder wins** the contract and chooses the trump.
-- Because the opener must bid 16, there is **always a bidder** — there is no all-pass redeal.
+> The full mechanic — terms, flow, and worked examples — is in **`29 Bidding Logic Update.md`** (the source of truth for bidding). Summary:
 
-**The target:** the bidding team must capture **at least as many of the 29 points as their bid** (adjusted by Marriage, §6). The defending team sets the contract by holding the bidders below their target. The lowest possible target in any hand is **15** (a forced 16 bid reduced by a bidder's Marriage, floored at 15).
+- Bidding happens **after** each player has seen their full 8-card hand. Range **16–29**; **Single Hand** sits above 29 (§9).
+- The **opener** (player to the dealer's right) is **forced to open at 16** (or declare Single Hand) and may **not** pass.
+- The auction is a sequence of **localized 1-vs-1 duels**, not a free escalation. Each of the other three players gets **exactly one challenge slot**, in counter-clockwise order: **pass** (eliminated) or **challenge** (bid strictly higher), which starts a duel with the current **holder**.
+- **Asymmetric matching:** inside a duel only the **holder** may **match** (bid the same number to retain) or raise; the **challenger** must always **raise** (never match) or pass. The duel ends when one side passes — if the holder passes, the challenger becomes the new holder.
+- At **29** (the cap) the holder may match/pass; the challenger can only declare Single Hand or pass.
+- After the last slot resolves, the **current holder wins** the contract and chooses trump. The forced opener guarantees a bidder, so there is **no all-pass redeal**.
+
+**The target:** the bidding team must capture **at least as many of the 29 points as their bid** (adjusted by Marriage, §6). The lowest possible target is **15** (a forced 16 reduced by a bidder's Marriage, floored at 15).
 
 ---
 

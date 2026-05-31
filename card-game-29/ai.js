@@ -1,37 +1,27 @@
 // ── AI: Bidding ───────────────────────────────────────────────────────────────
 
 /**
- * Estimate how many points the hand can win and return a bid or 0 (pass).
- * `currentHighBid` is the current auction high (or 15 if no bids yet).
+ * The maximum bid this hand justifies — the most the AI will commit to.
+ * Used by the holder-match auction: as a challenger the AI raises while
+ * `value > currentBid`; as the holder it matches while `value >= currentBid`.
+ * (A weak hand returns < 16 and so never challenges; opener is forced separately.)
  */
-function aiBid(hand, currentHighBid) {
+function aiBidValue(hand) {
   const totalHandPts = hand.reduce((s, c) => s + POINT_VALUE[c.rank], 0);
 
-  // For each possible trump suit, compute a control bonus:
-  //   J+9 of same suit = 1.5 (strong control — both high trumps)
-  //   J alone          = 0.5 (moderate control)
-  //   +0.5 per card beyond 2 in the suit (length = additional tricks)
+  // Trump control bonus per suit: J+9 = 1.5, J alone = 0.5, +0.5 per card beyond 2.
   let trumpBonus = 0;
   for (const suit of SUITS) {
-    const sc    = hand.filter(c => c.suit === suit);
-    const hasJ  = sc.some(c => c.rank === 'J');
-    const has9  = sc.some(c => c.rank === '9');
+    const sc   = hand.filter(c => c.suit === suit);
+    const hasJ = sc.some(c => c.rank === 'J');
+    const has9 = sc.some(c => c.rank === '9');
     let suitBonus = hasJ && has9 ? 1.5 : hasJ ? 0.5 : 0;
     suitBonus += Math.max(0, sc.length - 2) * 0.5;
     trumpBonus = Math.max(trumpBonus, suitBonus);
   }
 
-  // Confidence = own hand points + conservative partner estimate (7.5)
-  // + trump control bonus. Cap bid at 22 regardless of hand.
-  const confidenceBid = totalHandPts + 7.5 + trumpBonus;
-  const maxBid = Math.min(Math.floor(confidenceBid), 22);
-  const raise  = currentHighBid + 1;        // a bid must be strictly higher
-
-  // Only raise if confidence supports at least the next legal bid (and it's in range).
-  if (maxBid >= raise && raise >= MIN_BID && raise <= 29) {
-    return raise;
-  }
-  return 0; // pass
+  // own points + conservative partner estimate (7.5) + trump control, capped at 22.
+  return Math.min(Math.floor(totalHandPts + 7.5 + trumpBonus), 22);
 }
 
 // ── AI: Single Hand declaration (§9) ───────────────────────────────────────────

@@ -39,7 +39,7 @@
 
     <!-- Right scoreboard -->
     <div id="scoreboard">
-      <div class="sb-row sb-head"><span class="sb-cap"></span><span>N–S</span><span>E–W</span></div>
+      <div class="sb-row sb-head"><span class="sb-cap"></span><span>We</span><span>They</span></div>
       <div class="sb-row"><span class="sb-cap">Score</span><span id="sb-score0">0</span><span id="sb-score1">0</span></div>
       <div class="sb-sub">Points</div>
       <div class="sb-row"><span class="sb-cap">Need</span><span id="sb-need0">–</span><span id="sb-need1">–</span></div>
@@ -48,6 +48,9 @@
 
     <!-- Hand-over announcement banner (sits over the felt, not the cards) -->
     <div id="reveal-banner" hidden></div>
+
+    <!-- Transient event toast (trump revealed / claim / marriage) -->
+    <div id="toast" hidden></div>
 
     <!-- Turn-direction arrow -->
     <div id="turn-arrow" hidden></div>
@@ -104,20 +107,8 @@
     <div class="panel-card panel-card-compact">
       <h2>Bidding</h2>
       <div id="auction-grid"></div>
-      <div id="bid-controls" hidden>
-        <div id="bid-row">
-          <button class="step-btn" onclick="stepBid(-1)">−</button>
-          <input id="bid-amount" type="number" min="16" max="29" value="16" readonly />
-          <button class="step-btn" onclick="stepBid(1)">+</button>
-        </div>
-        <div class="bid-actions">
-          <button class="btn btn-primary" onclick="onBidSubmit()">Bid</button>
-          <button class="btn btn-secondary" id="pass-btn" onclick="onPass()">Pass</button>
-        </div>
-        <div class="single-hand-row">
-          <button class="btn btn-single" onclick="onSingleHand()">Single Hand (solo ±6)</button>
-        </div>
-      </div>
+      <!-- Contextual controls are built by renderBiddingPanel() per stage -->
+      <div id="bid-controls" hidden></div>
     </div>
   </div>
 
@@ -180,11 +171,13 @@
 
   <!-- ── Match over overlay ─────────────────────────────────────────────────── -->
   <div id="match-over-panel" class="overlay-panel" hidden>
-    <div class="panel-card panel-card-wide">
+    <div class="panel-card">
       <div id="match-winner-text"></div>
       <p id="match-score-text"></p>
-      <div id="match-history"></div>
-      <button class="btn btn-primary" onclick="onNewMatch()">New Match</button>
+      <div class="bid-actions">
+        <button class="btn btn-primary" onclick="onNewMatch()">New Match</button>
+        <button class="btn btn-secondary" onclick="onShowScorecard()">Scorecard</button>
+      </div>
     </div>
   </div>
 

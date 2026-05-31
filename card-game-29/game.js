@@ -16,6 +16,12 @@ const MIN_BID      = 16;
 const MATCH_TARGET = 6;
 const AI_DELAY_MS  = 750;
 
+// Togglable rule options (seed of a future settings screen). Flip a flag to switch a rule.
+const RULE_OPTIONS = {
+  doubleRedouble: false,      // Double/Redouble window (×2/×4). Off: bid tiers grade stakes.
+  bidding:        'asymmetric', // 'asymmetric' holder-match auction (the only model implemented)
+};
+
 // Rules / Help content (three tabs).
 const RULES_HTML = [
   // 0 — Basic Play
@@ -57,23 +63,21 @@ const RULES_HTML = [
      <li>On your turn you may claim the rest — accepted only if your <b>own</b> hand wins every remaining trick.</li>
    </ul>`,
   // 2 — Bidding & Contracts
-  `<h3>Bidding</h3>
+  `<h3>Bidding — holder vs challenger</h3>
    <ul>
-     <li>The player to the dealer's right opens and must bid at least <b>16</b> (can't pass).</li>
-     <li>Others raise or pass; the highest bidder takes the contract and chooses trump.</li>
-   </ul>
-   <h3>Double / Redouble</h3>
-   <ul>
-     <li>Before the first trick, defenders may <b>Double</b> (×2 stakes); the bidders may then <b>Redouble</b> (×4).</li>
+     <li>The player to the dealer's right opens at <b>16</b> (or declares Single Hand) — they cannot pass.</li>
+     <li>Each other player, in turn, gets <b>one chance</b>: pass, or <b>challenge</b> by bidding higher.</li>
+     <li>A challenge starts a duel with the current <b>holder</b>. Only the holder may <b>match</b> (bid the
+         same number to keep the contract); the challenger must keep <b>raising</b>. The duel ends when one
+         side stops — the holder, by matching, has the edge.</li>
+     <li>Bids run 16–29; Single Hand sits above 29.</li>
    </ul>
    <h3>No Trump</h3>
-   <ul>
-     <li>Played with no trump — every trick is won by the highest card of the led suit.</li>
-   </ul>
+   <ul><li>Played with no trump — every trick is won by the highest card of the led suit.</li></ul>
    <h3>Single Hand (solo ±6)</h3>
    <ul>
-     <li>A bid above 29: play alone, partner sits out, trump open from the start.</li>
-     <li>Win all 8 tricks → <b>+6</b>; lose any trick → <b>−6</b>.</li>
+     <li>Above 29 on the ladder: play alone, partner sits out, trump open from the start.</li>
+     <li>Win all 8 tricks → <b>+6</b>; lose any trick → <b>−6</b> (the hand ends the moment a trick is lost).</li>
    </ul>`,
 ];
 
@@ -86,12 +90,16 @@ let state = {
   gameScore:    [0, 0],
   handHistory:  [],          // per-hand records for the match-end score table
 
-  // Bidding
-  passed:        [false, false, false, false],
+  // Bidding (asymmetric holder-match model)
+  bidOrder:      [0, 1, 2, 3],
+  eliminated:    [false, false, false, false],
   currentBidder: 0,
-  highBid:       MIN_BID - 1,
-  highBidder:    null,
-  bidLog:        [],         // {seat, call} per call, for the auction grid
+  highBid:       MIN_BID - 1,   // currentBid
+  highBidder:    null,          // holder
+  challenger:    null,
+  slotIdx:       0,
+  bidStage:      'open',
+  bidLog:        [],            // {seat, call} per action, for the auction grid
 
   // Trump
   declarer:      null,
@@ -181,6 +189,7 @@ function recordHand(rec) {
 
 function startHand() {
   if (advanceTimeout !== null) { clearTimeout(advanceTimeout); advanceTimeout = null; }
+  clearBidTimeout();
   hideMarriagePrompt();
   show('hand-result-panel', false);
   show('match-over-panel', false);
@@ -192,10 +201,14 @@ function startHand() {
   state.hands = dealHands(deck);
   state.dealtHands = state.hands.map(h => h.map(c => ({ ...c })));   // snapshot for review
 
-  state.passed         = [false, false, false, false];
-  state.currentBidder  = nextSeat(state.dealer);
+  state.bidOrder       = [0, 1, 2, 3].map(i => (state.dealer + 1 + i) % 4);
+  state.eliminated     = [false, false, false, false];
+  state.currentBidder  = state.bidOrder[0];
   state.highBid        = MIN_BID - 1;
   state.highBidder     = null;
+  state.challenger     = null;
+  state.slotIdx        = 0;
+  state.bidStage       = 'open';
   state.bidLog         = [];
   state.declarer       = null;
   state.trumpSuit      = null;
@@ -219,7 +232,7 @@ function startHand() {
 
   setPhase(PHASE.BIDDING);
   renderAll();
-  setTimeout(advanceBidding, 300);
+  laterBid(startBidding, 300);
 }
 
 // ── Phase ─────────────────────────────────────────────────────────────────────
@@ -231,80 +244,140 @@ function setPhase(p) {
 
 // ── Bidding ───────────────────────────────────────────────────────────────────
 
-// The opener (first to act) is forced to bid ≥16 and may not pass (§3); this is
-// true only for the very first call of the auction, before anyone has bid or passed.
-function isForcedOpener() {
-  return state.highBidder === null && !state.passed.some(Boolean);
+// Asymmetric holder-match auction (supersedes Rulebook §3 — see 29 Bidding Logic Update.md).
+// `state.highBid` = currentBid, `state.highBidder` = holder. bidStage ∈
+//   'open'          → P1 opens 16 or Single Hand (forced, no pass)
+//   'slot-open'     → a challenger Px chooses Pass / Challenge / Single Hand
+//   'vs-holder'     → the holder responds Match / Raise / Pass / Single Hand
+//   'vs-challenger' → the challenger responds Raise / Pass / Single Hand (never match)
+
+let bidTimeout = null;
+function laterBid(fn, delay) {
+  if (bidTimeout !== null) { clearTimeout(bidTimeout); bidTimeout = null; }
+  bidTimeout = setTimeout(() => { bidTimeout = null; fn(); }, delay);
+}
+function clearBidTimeout() { if (bidTimeout !== null) { clearTimeout(bidTimeout); bidTimeout = null; } }
+
+function startBidding() {
+  state.bidOrder   = [0, 1, 2, 3].map(i => (state.dealer + 1 + i) % 4); // P1..P4 ccw from dealer's right
+  state.eliminated = [false, false, false, false];
+  state.highBid    = MIN_BID - 1;   // currentBid
+  state.highBidder = null;          // holder
+  state.challenger = null;
+  state.slotIdx    = 0;
+  state.bidStage   = 'open';
+  state.currentBidder = state.bidOrder[0];
+  state.bidLog     = [];
+  bidStep();
 }
 
-function advanceBidding() {
-  const passedCount = state.passed.filter(Boolean).length;
-
-  // No all-pass redeal — the forced-16 opener guarantees a bidder every hand (§11).
-  if (passedCount === 3 && state.highBidder !== null) {
-    finishBidding();
-    return;
-  }
-
-  while (state.passed[state.currentBidder]) {
-    state.currentBidder = nextSeat(state.currentBidder);
-  }
-
+// Render + hand off to the human (await click) or the AI (delayed).
+function bidStep() {
   renderInfo();
-  renderBiddingPanel();   // refresh auction grid + toggle the human's controls
-
-  if (isHuman(state.currentBidder)) {
-    const hi = state.highBid >= MIN_BID ? state.highBid : 0;
-    setStatus(hi
-      ? `Current high bid: ${hi} by ${seatName(state.highBidder)}. Your move.`
-      : 'No bids yet — you open; minimum bid 16.');
+  renderBiddingPanel();
+  const seat = state.currentBidder;
+  if (isHuman(seat)) {
+    const cb = state.highBid;
+    const msg = {
+      'open':          'You open — bid 16 or declare Single Hand.',
+      'slot-open':     `High bid ${cb} by ${seatName(state.highBidder)}. Challenge, pass, or Single Hand.`,
+      'vs-holder':     `${seatName(state.challenger)} challenged at ${cb}. Hold (match), raise, pass, or Single Hand.`,
+      'vs-challenger': `You're challenging at ${cb}. Raise, pass, or Single Hand.`,
+    }[state.bidStage];
+    setStatus(msg);
   } else {
-    setStatus(`${seatName(state.currentBidder)} is thinking…`);
-    setTimeout(doAIBid, AI_DELAY_MS);
+    setStatus(`${seatName(seat)} is thinking…`);
+    laterBid(doAIBid, AI_DELAY_MS);
   }
 }
 
 function doAIBid() {
-  const seat = state.currentBidder;
-  // A truly dominant hand may declare Single Hand, closing the auction (§9).
-  if (aiShouldSingleHand(state.hands[seat])) { declareSingleHand(seat); return; }
-  let bid = aiBid(state.hands[seat], state.highBid);
-  if (bid === 0 && isForcedOpener()) bid = MIN_BID;   // opener can't pass — bid 16
-  applyBid(seat, bid);
+  const seat = state.currentBidder, hand = state.hands[seat];
+  const cb = state.highBid, value = aiBidValue(hand);
+  const canRaise = cb < 29;
+  switch (state.bidStage) {
+    case 'open':
+      return aiShouldSingleHand(hand) ? applyBidAction(seat, 'sh') : applyBidAction(seat, 'open16');
+    case 'slot-open':
+      if (aiShouldSingleHand(hand)) return applyBidAction(seat, 'sh');
+      return (value > cb && canRaise) ? applyBidAction(seat, 'challenge', cb + 1) : applyBidAction(seat, 'pass');
+    case 'vs-holder':                                   // this seat is the holder
+      return (value >= cb) ? applyBidAction(seat, 'match') : applyBidAction(seat, 'pass');
+    case 'vs-challenger':                               // this seat is the challenger
+      return (value > cb && canRaise) ? applyBidAction(seat, 'raise', cb + 1) : applyBidAction(seat, 'pass');
+  }
 }
 
-function humanBid(amount) {
+// Human entry point (called from the dynamic bid controls).
+function humanBidAction(kind, amount) {
   if (state.phase !== PHASE.BIDDING || !isHuman(state.currentBidder)) return;
-  if (amount === 0 && isForcedOpener()) {
-    setStatus('As the opener you must bid 16 — you cannot pass.');
+  if ((kind === 'challenge' || kind === 'raise') && !(amount > state.highBid && amount <= 29)) {
+    setStatus(`Bid must be higher than ${state.highBid}.`);
     return;
   }
-  if (amount !== 0 && amount <= state.highBid) {
-    setStatus('Bid must be higher than the current high bid.');
-    return;
-  }
-  applyBid(0, amount);
+  show('bid-controls', false);
+  applyBidAction(0, kind, amount);
+}
+function humanRaise() {
+  const v = parseInt((document.getElementById('bid-amount') || {}).value, 10);
+  humanBidAction(state.bidStage === 'slot-open' ? 'challenge' : 'raise', v);
 }
 
-function applyBid(seat, amount) {
-  if (amount === 0) {
-    state.passed[seat] = true;
-    state.bidLog.push({ seat, call: 'Pass' });
-    setStatus(`${seatName(seat)} passes.`);
-  } else {
-    state.highBid    = amount;
-    state.highBidder = seat;
-    state.bidLog.push({ seat, call: amount });
-    setStatus(`${seatName(seat)} bids ${amount}.`);
+function applyBidAction(seat, kind, amount) {
+  switch (kind) {
+    case 'sh':
+      clearBidTimeout();
+      declareSingleHand(seat);                          // ends the auction
+      return;
+    case 'open16':
+      state.highBid = MIN_BID; state.highBidder = seat;
+      state.bidLog.push({ seat, call: MIN_BID });
+      setStatus(`${seatName(seat)} opens at 16.`);
+      startSlot(1);
+      return;
+    case 'challenge':
+      state.highBid = amount; state.challenger = seat;
+      state.bidLog.push({ seat, call: amount });
+      setStatus(`${seatName(seat)} challenges with ${amount}.`);
+      state.bidStage = 'vs-holder'; state.currentBidder = state.highBidder;
+      bidStep();
+      return;
+    case 'match':                                       // holder retains at currentBid
+      state.bidLog.push({ seat, call: state.highBid });
+      setStatus(`${seatName(seat)} holds at ${state.highBid}.`);
+      state.bidStage = 'vs-challenger'; state.currentBidder = state.challenger;
+      bidStep();
+      return;
+    case 'raise':
+      state.highBid = amount; state.bidLog.push({ seat, call: amount });
+      setStatus(`${seatName(seat)} raises to ${amount}.`);
+      if (state.bidStage === 'vs-holder') { state.bidStage = 'vs-challenger'; state.currentBidder = state.challenger; }
+      else                                { state.bidStage = 'vs-holder';     state.currentBidder = state.highBidder; }
+      bidStep();
+      return;
+    case 'pass':
+      state.eliminated[seat] = true;
+      state.bidLog.push({ seat, call: 'Pass' });
+      if (state.bidStage === 'vs-holder') {             // holder concedes → challenger takes over
+        setStatus(`${seatName(seat)} passes — ${seatName(state.challenger)} takes the contract.`);
+        state.highBidder = state.challenger;
+      } else {
+        setStatus(`${seatName(seat)} passes.`);
+      }
+      startSlot(state.slotIdx + 1);
+      return;
   }
-  renderInfo();
-  renderAuctionGrid();
+}
 
-  let next = nextSeat(seat), loops = 0;
-  while (state.passed[next] && loops < 4) { next = nextSeat(next); loops++; }
-  state.currentBidder = next;
-
-  setTimeout(advanceBidding, 500);
+// Open the next challenge slot (P2..P4); if none remain the holder wins.
+function startSlot(idx) {
+  state.challenger = null;
+  while (idx <= 3 && (state.eliminated[state.bidOrder[idx]] || state.bidOrder[idx] === state.highBidder)) idx++;
+  state.slotIdx = idx;
+  if (idx > 3) { finishBidding(); return; }
+  state.bidStage = 'slot-open';
+  state.currentBidder = state.bidOrder[idx];
+  bidStep();
 }
 
 function finishBidding() {
@@ -400,8 +473,9 @@ function onStakeNo()  { if (stakeResolve) stakeResolve(false); }
 const aiPause = () => new Promise(r => setTimeout(r, AI_DELAY_MS));
 
 async function beginDoubleWindow() {
-  // Single Hand has no doubling (§9); go straight to play.
-  if (state.isSingleHand) { beginPlay(); return; }
+  // Single Hand has no doubling (§9); and the whole feature is gated off by default
+  // (RULE_OPTIONS.doubleRedouble) — code kept for a future settings toggle.
+  if (!RULE_OPTIONS.doubleRedouble || state.isSingleHand) { beginPlay(); return; }
 
   setPhase(PHASE.DOUBLE);
   const declTeam = teamOf(state.declarer);
@@ -566,8 +640,7 @@ function revealTrump() {
   setStatus(`🔔 TRUMP REVEALED — ${SUIT_SYMBOL[state.trumpSuit]} ${state.trumpSuit.toUpperCase()}!`);
   const ind = document.getElementById('trump-card-slot');
   if (ind) { ind.classList.add('reveal-flash'); setTimeout(() => ind.classList.remove('reveal-flash'), 1600); }
-  showRevealBanner(`🔔 Trump is ${SUIT_SYMBOL[state.trumpSuit]} ${state.trumpSuit}!`);
-  setTimeout(hideRevealBanner, 1400);
+  showToast(`🔔 Trump is ${SUIT_SYMBOL[state.trumpSuit]} ${state.trumpSuit}!`);
   for (let i = 0; i < 4; i++) renderHand(i);
   // A side's Marriage window may now open (gated on having won a trick).
   setTimeout(checkForMarriage, 200);
@@ -642,6 +715,7 @@ function declareMarriage(seat) {
   state.marriageAdj = (holderTeam === declarerTeam) ? -4 : +4;
   const dir = holderTeam === declarerTeam ? 'Bid −4 (easier)!' : 'Bid +4 (harder)!';
   setStatus(`${seatName(seat)} declares the Marriage (K+Q of trump)! ${dir}`);
+  showToast(`💍 ${seatName(seat)} declares Marriage — ${dir}`);
   hideMarriagePrompt();
   renderInfo();
 }
@@ -799,6 +873,18 @@ function showRevealBanner(text) {
 function hideRevealBanner() {
   const b = document.getElementById('reveal-banner');
   if (b) b.hidden = true;
+}
+
+// Transient center toast for in-play events (trump reveal, Marriage, claim) — auto-fades.
+let toastTimer = null;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  if (!t) return;
+  t.textContent = msg;
+  t.hidden = false;
+  t.classList.remove('toast-show'); void t.offsetWidth; t.classList.add('toast-show');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.classList.remove('toast-show'); t.hidden = true; }, 1700);
 }
 
 let pendingClaimBanner = null;   // set by a claim/give-up so concludeHand shows it first
@@ -1004,27 +1090,51 @@ function renderTrickCard(seat, card) {
   if (slot) { slot.innerHTML = ''; slot.appendChild(createCardEl(card, true)); }
 }
 
+// Build the human's bid controls for the current stage (opener / challenger / holder).
 function renderBiddingPanel() {
   renderAuctionGrid();
   const myTurn = state.phase === PHASE.BIDDING && isHuman(state.currentBidder);
+  const ctrls  = document.getElementById('bid-controls');
   show('bid-controls', myTurn);
-  if (myTurn) {
-    const minNext = Math.max(state.highBid + 1, MIN_BID);
-    const inp = document.getElementById('bid-amount');
-    if (inp) { inp.min = minNext; inp.max = 29; inp.value = minNext; }
-    const pass = document.getElementById('pass-btn');
-    if (pass) pass.disabled = isForcedOpener();
+  if (!myTurn || !ctrls) return;
+
+  const cb = state.highBid, canRaise = cb < 29;
+  const stepper = (min) =>
+    `<div id="bid-row">
+       <button class="step-btn" onclick="stepBid(-1)">−</button>
+       <input id="bid-amount" type="number" min="${min}" max="29" value="${min}" readonly>
+       <button class="step-btn" onclick="stepBid(1)">+</button>
+     </div>`;
+  const sh = `<div class="single-hand-row"><button class="btn-shlink" onclick="humanBidAction('sh')">Single Hand (solo ±6)</button></div>`;
+
+  let html;
+  if (state.bidStage === 'open') {
+    html = `<p class="bid-hint">You open the auction.</p>
+      <div class="bid-actions"><button class="btn btn-primary" onclick="humanBidAction('open16')">Open at 16</button></div>${sh}`;
+  } else if (state.bidStage === 'vs-holder') {     // human is the holder, defending
+    html = `<div class="bid-actions">
+        <button class="btn btn-primary" onclick="humanBidAction('match')">Hold at ${cb}</button>
+        ${canRaise ? `<button class="btn btn-secondary" onclick="humanRaise()">Raise</button>` : ''}
+        <button class="btn btn-secondary" onclick="humanBidAction('pass')">Pass</button>
+      </div>${canRaise ? stepper(cb + 1) : ''}${sh}`;
+  } else {                                          // slot-open or vs-challenger: human is the challenger
+    const label = state.bidStage === 'slot-open' ? 'Challenge' : 'Raise';
+    html = `${canRaise ? stepper(cb + 1) : '<p class="bid-hint">Already at the 29 cap — Single Hand or pass.</p>'}
+      <div class="bid-actions">
+        ${canRaise ? `<button class="btn btn-primary" onclick="humanRaise()">${label}</button>` : ''}
+        <button class="btn btn-secondary" onclick="humanBidAction('pass')">Pass</button>
+      </div>${sh}`;
   }
+  ctrls.innerHTML = html;
 }
 
-// Nudge the human's pending bid within [minNext, 29].
+// Nudge the human's pending bid within [min, 29] (min taken from the input).
 function stepBid(delta) {
   const inp = document.getElementById('bid-amount');
   if (!inp) return;
-  const min = Math.max(state.highBid + 1, MIN_BID), max = 29;
+  const min = parseInt(inp.min, 10) || MIN_BID, max = 29;
   let v = (parseInt(inp.value, 10) || min) + delta;
-  v = Math.max(min, Math.min(max, v));
-  inp.value = v;
+  inp.value = Math.max(min, Math.min(max, v));
 }
 
 // Bridge-style auction grid: columns West · North · East · South, one row per round.
@@ -1117,7 +1227,8 @@ function renderMatchOver() {
   setText('match-winner-text', `${TEAM_NAMES[winner]} win the match! 🎉`);
   setText('match-score-text',
     `${TEAM_NAMES[0]} ${state.gameScore[0]} — ${state.gameScore[1]} ${TEAM_NAMES[1]}`);
-  renderHistoryTable('match-history');
+  // Cards-first: the compact panel shows the result; the full table is one tap away
+  // (Scorecard button → #scorecard-panel) so the opened hands stay visible.
   show('match-over-panel', true);
   show('hand-result-panel', false);
 }
@@ -1162,17 +1273,7 @@ function setText(id, text) {
 
 // ── Button handlers ───────────────────────────────────────────────────────────
 
-function onBidSubmit() {
-  const val = parseInt(document.getElementById('bid-amount').value, 10);
-  show('bid-controls', false);
-  humanBid(val);
-}
-function onPass()           { show('bid-controls', false); humanBid(0); }
-function onSingleHand() {
-  if (state.phase !== PHASE.BIDDING || !isHuman(state.currentBidder)) return;
-  show('bid-controls', false);
-  declareSingleHand(0);
-}
+// Bidding actions are wired via humanBidAction()/humanRaise() (see the bidding engine).
 function onSelectTrump(suit){ humanSelectTrump(suit); }
 function onDeclareMarriage()    { declareMarriage(0); }
 function onSkipMarriage()       { hideMarriagePrompt(); setStatus('Marriage skipped.'); }
@@ -1199,11 +1300,17 @@ function renderRules() {
 
 // ── Responsive scaling ─────────────────────────────────────────────────────────
 
-// Scale the fixed 800×600 table to fit any screen (phone → iPad), preserving aspect ratio.
+// Landscape: scale the fixed 800×600 table to fit (preserve aspect ratio).
+// Portrait/narrow: clear the transform — the @media portrait layout fills the viewport.
 function fitToViewport() {
-  const s = Math.min(window.innerWidth / 800, window.innerHeight / 600);
   const root = document.getElementById('game-root');
-  if (root) root.style.transform = `translate(-50%,-50%) scale(${s})`;
+  if (!root) return;
+  if (window.innerWidth / window.innerHeight < 1.1) {
+    root.style.transform = 'none';
+  } else {
+    const s = Math.min(window.innerWidth / 800, window.innerHeight / 600);
+    root.style.transform = `translate(-50%,-50%) scale(${s})`;
+  }
 }
 window.addEventListener('resize', fitToViewport);
 

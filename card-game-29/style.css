@@ -102,6 +102,16 @@ html, body {
   box-shadow: 0 8px 32px rgba(0,0,0,0.55); max-width: 72%;
 }
 
+/* Transient event toast (centre-upper, auto-fades) */
+#toast {
+  position: absolute; top: 38%; left: 50%; transform: translate(-50%,-50%);
+  z-index: 55; background: rgba(15,23,42,0.92); color: #e2e8f0;
+  font-weight: 700; font-size: 0.82rem; padding: 8px 18px; border-radius: 20px;
+  text-align: center; box-shadow: 0 6px 24px rgba(0,0,0,0.5); max-width: 80%;
+  opacity: 0; transition: opacity 0.25s;
+}
+#toast.toast-show { opacity: 1; }
+
 /* Floating action chips (bottom-right of the felt, clear of the South hand) */
 #action-chips {
   position: absolute; right: 10px; bottom: 26px; z-index: 6;
@@ -252,8 +262,10 @@ html, body {
 .btn-secondary:hover { background: #475569; }
 .bid-actions { display: flex; justify-content: center; gap: 8px; }
 .single-hand-row { margin-top: 10px; }
-.btn-single { background: #b45309; color: #fff; width: 100%; font-size: 0.8rem; }
-.btn-single:hover { background: #92400e; }
+/* Single Hand is the least-likely option — a small secondary link, not a big bar */
+.btn-shlink { background: none; border: none; color: #fb923c; font-size: 0.72rem; text-decoration: underline; cursor: pointer; padding: 2px 4px; }
+.btn-shlink:hover { color: #fdba74; }
+.bid-hint { font-size: 0.74rem; color: #94a3b8; margin-bottom: 8px; }
 
 /* Bidding stepper */
 #bid-row { display: flex; justify-content: center; align-items: center; gap: 8px; margin-bottom: 12px; }
@@ -333,3 +345,58 @@ html, body {
   min-width: 280px;
 }
 #marriage-prompt p { font-size: 0.85rem; color: #fde047; margin-bottom: 10px; font-weight: 600; }
+
+/* ── Portrait / phone layout (overlapping fan hands, fluid fill) ───────────────── */
+@media (max-aspect-ratio: 11/10) {
+  #game-root {
+    top: 0; left: 0; transform: none !important;
+    width: 100vw; height: 100vh; border-radius: 0;
+  }
+  #top-toolbar { height: 7vw; padding: 0 3vw; }
+  #app-title { font-size: 4.2vw; }
+  #status-msg { font-size: 3vw; }
+  .tb-btn { font-size: 4.4vw; width: 8vw; height: 6vw; }
+
+  /* cards scale with viewport width (≈1 : 1.45) */
+  .card { width: 14vw; height: 20.3vw; border-radius: 1.4vw; }
+  .card.face-down { width: 11vw; height: 16vw; }
+  #trump-card-slot, #trump-card-slot .card { width: 8vw; height: 11.6vw; }
+
+  /* overlapping fans so all 8 cards fit the width / height */
+  #hand-0 .card { margin-left: -6vw; }                 /* South fan */
+  #hand-2 .card { margin-left: -9vw; }                 /* North fan — tighter, to clear the panels */
+  #hand-0 .card:first-child, #hand-2 .card:first-child { margin-left: 0; }
+  #hand .hand, #hand-0, #hand-2 { gap: 0; }            /* no extra gap on top of the overlap */
+  #hand-1 .card, #hand-3 .card { margin-bottom: -12vw; }
+  #hand-1 .card:last-child, #hand-3 .card:last-child { margin-bottom: 0; }
+
+  /* table reflow: thin side columns, taller North/South bands */
+  #table {
+    grid-template-columns: 15vw 1fr 15vw;
+    grid-template-rows: 22vw 1fr 26vw;
+    padding: 1.5vw; gap: 1vw;
+  }
+  #center-area { width: 46vw; height: 46vw; }
+  .trick-slot { width: 14vw; height: 20.3vw; }
+
+  /* compact info panels flanking the North fan */
+  #status-panel { left: 1.5vw; top: 1.5vw; min-width: 24vw; font-size: 2.6vw; padding: 1.2vw 1.6vw; }
+  #scoreboard   { right: 1.5vw; top: 1.5vw; min-width: 28vw; font-size: 2.6vw; padding: 1.2vw 1.6vw; }
+  .sb-row { grid-template-columns: 1fr 8vw 8vw; }
+  .player-label { font-size: 2.3vw; }
+  #trump-indicator { gap: 1.5vw; margin-top: 1.5vw; }
+
+  /* modals & overlays fit the narrow width and clear the toolbar */
+  .overlay-panel { top: 7vw; }
+  .panel-card, .panel-card-compact, .panel-card-wide { max-width: 92vw; width: 92vw; padding: 4vw; }
+  .auction-table, #rules-body, .history-table { font-size: 3vw; }
+  .btn { font-size: 3.4vw; padding: 2.4vw 5vw; }
+  .step-btn { width: 9vw; height: 9vw; font-size: 5vw; }
+  #bid-amount { width: 16vw; font-size: 5vw; }
+
+  /* floating chips, banners, arrow */
+  #action-chips { right: 2vw; bottom: 28vw; gap: 1.5vw; }
+  #action-chips button { font-size: 3vw; padding: 1.2vw 3vw; }
+  #reveal-banner, #toast { font-size: 3.4vw; max-width: 86vw; padding: 2.5vw 5vw; }
+  #turn-arrow { border-left-width: 3.5vw; border-right-width: 3.5vw; border-top-width: 5vw; }
+}
