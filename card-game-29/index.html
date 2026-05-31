@@ -7,27 +7,49 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+
+
+
 <div id="game-root">
 
-  <!-- ── Score bar ──────────────────────────────────────────────────────────── -->
-  <div id="score-bar">
-    <span class="score-chip team0">North–South: <span id="score-team0">0</span></span>
-    <span id="bid-label"></span>
-    <span class="score-chip team1">East–West: <span id="score-team1">0</span></span>
+  <!-- ── Top toolbar ──────────────────────────────────────────────────────── -->
+  <div id="top-toolbar">
+    <span id="app-title">29</span>
+    <div id="toolbar-icons">
+      <button class="tb-btn" title="Scorecard" onclick="onShowScorecard()">🗒</button>
+      <button class="tb-btn" title="How to play" onclick="onShowRules()">?</button>
+      <button class="tb-btn" title="New match" onclick="onNewMatch()">⟳</button>
+    </div>
   </div>
 
-  <!-- ── Info bar (live points + trump) ────────────────────────────────────── -->
-  <div id="info-bar">
-    <span id="pts-team0">N–S: 0 pts</span>
-    <span id="pts-bid-target"></span>
-    <span id="pts-team1">E–W: 0 pts</span>
-  </div>
+  <!-- ── Felt (play surface) ──────────────────────────────────────────────── -->
+  <div id="felt">
 
-  <!-- ── Status bar ────────────────────────────────────────────────────────── -->
-  <div id="status-bar">
-    <span id="status-msg"></span>
-    <span id="trump-badge" class="trump-badge"></span>
-  </div>
+    <!-- Left status panel -->
+    <div id="status-panel">
+      <div class="sp-row"><span class="sp-lbl">Dealer</span><span class="sp-val" id="sp-dealer">–</span></div>
+      <div class="sp-row"><span class="sp-lbl">Bidder</span><span class="sp-val" id="sp-bidder">–</span></div>
+      <div class="sp-row"><span class="sp-lbl">Bid</span><span class="sp-val" id="sp-bid">–</span></div>
+      <div id="trump-indicator">
+        <span class="sp-lbl">Trump</span>
+        <div id="trump-card-slot"></div>
+      </div>
+    </div>
+
+    <!-- Right scoreboard -->
+    <div id="scoreboard">
+      <div class="sb-row sb-head"><span class="sb-cap"></span><span>N–S</span><span>E–W</span></div>
+      <div class="sb-row"><span class="sb-cap">Score</span><span id="sb-score0">0</span><span id="sb-score1">0</span></div>
+      <div class="sb-sub">Points</div>
+      <div class="sb-row"><span class="sb-cap">Need</span><span id="sb-need0">–</span><span id="sb-need1">–</span></div>
+      <div class="sb-row"><span class="sb-cap">Taken</span><span id="sb-taken0">0</span><span id="sb-taken1">0</span></div>
+    </div>
+
+    <!-- Hand-over announcement banner (sits over the felt, not the cards) -->
+    <div id="reveal-banner" hidden></div>
+
+    <!-- Turn-direction arrow -->
+    <div id="turn-arrow" hidden></div>
 
   <!-- ── Card table ─────────────────────────────────────────────────────────── -->
   <div id="table">
@@ -68,16 +90,33 @@
 
   </div><!-- #table -->
 
+    <!-- Status line -->
+    <div id="status-bar">
+      <span id="status-msg"></span>
+      <button id="claim-btn" onclick="onClaim()" hidden>Claim</button>
+    </div>
+
+  </div><!-- #felt -->
+
   <!-- ── Bidding overlay ────────────────────────────────────────────────────── -->
   <div id="bidding-panel" class="overlay-panel" hidden>
-    <div class="panel-card">
-      <h2>Your Bid</h2>
-      <p>Bid higher than the current high, or pass.</p>
-      <div id="bid-row">
-        <input id="bid-amount" type="number" min="16" max="29" value="16" />
+    <div class="panel-card panel-card-compact">
+      <h2>Bidding</h2>
+      <div id="auction-grid"></div>
+      <div id="bid-controls" hidden>
+        <div id="bid-row">
+          <button class="step-btn" onclick="stepBid(-1)">−</button>
+          <input id="bid-amount" type="number" min="16" max="29" value="16" readonly />
+          <button class="step-btn" onclick="stepBid(1)">+</button>
+        </div>
+        <div class="bid-actions">
+          <button class="btn btn-primary" onclick="onBidSubmit()">Bid</button>
+          <button class="btn btn-secondary" id="pass-btn" onclick="onPass()">Pass</button>
+        </div>
+        <div class="single-hand-row">
+          <button class="btn btn-single" onclick="onSingleHand()">Single Hand (solo ±6)</button>
+        </div>
       </div>
-      <button class="btn btn-primary" onclick="onBidSubmit()">Bid</button>
-      <button class="btn btn-secondary" onclick="onPass()">Pass</button>
     </div>
   </div>
 
@@ -96,11 +135,30 @@
     </div>
   </div>
 
+  <!-- ── Double / Redouble prompt ───────────────────────────────────────────── -->
+  <div id="stake-panel" class="overlay-panel" hidden>
+    <div class="panel-card">
+      <h2 id="stake-title">Double?</h2>
+      <p id="stake-text"></p>
+      <button class="btn btn-primary" onclick="onStakeYes()">Yes</button>
+      <button class="btn btn-secondary" onclick="onStakeNo()">No</button>
+    </div>
+  </div>
+
+  <!-- ── Claim rejected ─────────────────────────────────────────────────────── -->
+  <div id="claim-reject-panel" class="overlay-panel" hidden>
+    <div class="panel-card">
+      <h2>Claim Rejected</h2>
+      <p>Your claim doesn't hold against best defence — play continues.</p>
+      <button class="btn btn-primary" onclick="onClaimRejectOk()">OK</button>
+    </div>
+  </div>
+
   <!-- ── Royal pair prompt (toast, not full overlay) ───────────────────────── -->
-  <div id="pair-prompt" hidden>
-    <p>You hold K+Q of trump — declare the Royal Pair?</p>
-    <button class="btn btn-primary" onclick="onDeclarePair()">Declare Pair</button>
-    <button class="btn btn-secondary" onclick="onSkipPair()">Skip</button>
+  <div id="marriage-prompt" hidden>
+    <p>You hold K+Q of trump — declare the Marriage?</p>
+    <button class="btn btn-primary" onclick="onDeclareMarriage()">Declare Marriage</button>
+    <button class="btn btn-secondary" onclick="onSkipMarriage()">Skip</button>
   </div>
 
   <!-- ── Hand result overlay ────────────────────────────────────────────────── -->
@@ -112,23 +170,51 @@
         <span class="gs0" id="hand-score-team0"></span>
         <span class="gs1" id="hand-score-team1"></span>
       </div>
-      <button class="btn btn-primary" onclick="onNextHand()">Next Hand</button>
+      <div class="bid-actions">
+        <button class="btn btn-primary" onclick="onNextHand()">Next Hand</button>
+        <button class="btn btn-secondary" onclick="onShowScorecard()">Scorecard</button>
+      </div>
     </div>
   </div>
 
   <!-- ── Match over overlay ─────────────────────────────────────────────────── -->
   <div id="match-over-panel" class="overlay-panel" hidden>
-    <div class="panel-card">
+    <div class="panel-card panel-card-wide">
       <div id="match-winner-text"></div>
       <p id="match-score-text"></p>
+      <div id="match-history"></div>
       <button class="btn btn-primary" onclick="onNewMatch()">New Match</button>
+    </div>
+  </div>
+
+  <!-- ── Rules / Help ───────────────────────────────────────────────────────── -->
+  <div id="rules-panel" class="overlay-panel" hidden>
+    <div class="panel-card panel-card-wide">
+      <h2>How to Play — 29</h2>
+      <div id="rules-tabs">
+        <button class="rules-tab active" onclick="onRulesTab(0)">Basic Play</button>
+        <button class="rules-tab" onclick="onRulesTab(1)">Rules &amp; Scoring</button>
+        <button class="rules-tab" onclick="onRulesTab(2)">Bidding &amp; Contracts</button>
+      </div>
+      <div id="rules-body"></div>
+      <button class="btn btn-primary" onclick="onCloseRules()">Close</button>
+    </div>
+  </div>
+
+  <!-- ── Scorecard ──────────────────────────────────────────────────────────── -->
+  <div id="scorecard-panel" class="overlay-panel" hidden>
+    <div class="panel-card panel-card-wide">
+      <h2>Scorecard</h2>
+      <div id="scorecard-history"></div>
+      <button class="btn btn-primary" onclick="onCloseScorecard()">Close</button>
     </div>
   </div>
 
 </div><!-- #game-root -->
 
-<script src="cards.js"></script>
-<script src="ai.js"></script>
-<script src="game.js"></script>
+<script src="elements.cardmeister.full.js?v=cm1"></script>
+<script src="cards.js?v=4"></script>
+<script src="ai.js?v=4"></script>
+<script src="game.js?v=4"></script>
 </body>
 </html>

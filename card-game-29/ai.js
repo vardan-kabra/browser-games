@@ -24,11 +24,59 @@ function aiBid(hand, currentHighBid) {
   // Confidence = own hand points + conservative partner estimate (7.5)
   // + trump control bonus. Cap bid at 22 regardless of hand.
   const confidenceBid = totalHandPts + 7.5 + trumpBonus;
+  const maxBid = Math.min(Math.floor(confidenceBid), 22);
+  const raise  = currentHighBid + 1;        // a bid must be strictly higher
 
-  if (confidenceBid > currentHighBid && confidenceBid >= MIN_BID) {
-    return Math.min(currentHighBid + 1, Math.min(Math.floor(confidenceBid), 22));
+  // Only raise if confidence supports at least the next legal bid (and it's in range).
+  if (maxBid >= raise && raise >= MIN_BID && raise <= 29) {
+    return raise;
   }
   return 0; // pass
+}
+
+// ── AI: Single Hand declaration (§9) ───────────────────────────────────────────
+
+/**
+ * Declare Single Hand only with a near-unbeatable hand: a suit holding both the
+ * Jack and Nine, a very strong point count, and several top cards overall.
+ * Winning all 8 tricks solo is hard, so this stays rare.
+ */
+function aiShouldSingleHand(hand) {
+  if (!hand || hand.length < 8) return false;
+  let hasJ9 = false;
+  for (const suit of SUITS) {
+    const sc = hand.filter(c => c.suit === suit);
+    if (sc.some(c => c.rank === 'J') && sc.some(c => c.rank === '9')) hasJ9 = true;
+  }
+  const handPts  = hand.reduce((s, c) => s + POINT_VALUE[c.rank], 0);
+  const topCards = hand.filter(c => c.rank === 'J' || c.rank === '9' || c.rank === 'A').length;
+  return hasJ9 && handPts >= 10 && topCards >= 5;
+}
+
+// ── AI: Double / Redouble (§7) ─────────────────────────────────────────────────
+
+/**
+ * A defender doubles when the contract looks ambitious (high bid) and this
+ * defender holds enough point-strength to help hold the bidders short.
+ * Deliberately conservative — doubling is the exception, not the rule.
+ */
+function aiShouldDouble(hand, bid) {
+  if (!hand || !hand.length) return false;
+  const handPts = hand.reduce((s, c) => s + POINT_VALUE[c.rank], 0);
+  return bid >= 20 && handPts >= 6;
+}
+
+/**
+ * The declarer redoubles only with a dominant hand — at least two of the top
+ * trumps (J/9) in the chosen suit (or 3+ J/9 overall in No Trump). Very rare.
+ */
+function aiShouldRedouble(hand, trumpSuit) {
+  if (!hand || !hand.length) return false;
+  if (trumpSuit) {
+    const t = hand.filter(c => c.suit === trumpSuit);
+    return t.filter(c => c.rank === 'J' || c.rank === '9').length >= 2;
+  }
+  return hand.filter(c => c.rank === 'J' || c.rank === '9').length >= 3;
 }
 
 // ── AI: Trump selection ───────────────────────────────────────────────────────
@@ -78,20 +126,33 @@ function aiPlayCard(hand, trick, trumpSuit, declarerIndex, seatIndex) {
   }
 }
 
-/** Leading a trick: lead the highest card in the strongest (most-points) suit */
+/**
+ * Leading a trick (soft heuristic — not a hard rule):
+ *  1. If we hold a Jack in a non-trump suit, lead it — it wins the trick and pulls points.
+ *  2. Otherwise lead a LOW zero-point card (7/8/Q/K), preferring a non-trump suit, so we
+ *     don't expose a valuable 9 / A / 10 to capture. Because the 9 is the highest-ranked
+ *     of these, "lowest rank" never selects a bare 9 unless it is literally the only card.
+ *  3. Trumps are led only when nothing else is left.
+ */
 function aiLead(hand, trumpSuit) {
   if (!hand || hand.length === 0) return null;
-  // Rank suits by total point value held
-  let bestSuit = null, bestPts = -1;
-  for (const suit of SUITS) {
-    const cards = hand.filter(c => c.suit === suit);
-    const pts = cards.reduce((s, c) => s + POINT_VALUE[c.rank] + RANK_ORDER[c.rank] * 0.1, 0);
-    if (pts > bestPts) { bestPts = pts; bestSuit = suit; }
+  const inSuit = (suit) => hand.filter(c => c.suit === suit);
+
+  // 1) Lead a Jack we hold in a non-trump suit (prefer the longest such suit for follow-up).
+  const jackSuits = SUITS.filter(s => s !== trumpSuit && inSuit(s).some(c => c.rank === 'J'));
+  if (jackSuits.length) {
+    jackSuits.sort((a, b) => inSuit(b).length - inSuit(a).length);
+    return inSuit(jackSuits[0]).find(c => c.rank === 'J');
   }
-  const suitCards = hand.filter(c => c.suit === bestSuit);
-  if (!suitCards.length) return hand[0]; // fallback
-  // Lead highest card of that suit
-  return suitCards.reduce((best, c) => RANK_ORDER[c.rank] > RANK_ORDER[best.rank] ? c : best);
+
+  // 2) Lead the lowest zero-point card, preferring non-trump.
+  const lowestZero = (cards) => {
+    const zero = cards.filter(c => POINT_VALUE[c.rank] === 0);
+    const pool = zero.length ? zero : cards;
+    return pool.reduce((lo, c) => RANK_ORDER[c.rank] < RANK_ORDER[lo.rank] ? c : lo);
+  };
+  const nonTrump = hand.filter(c => c.suit !== trumpSuit);
+  return lowestZero(nonTrump.length ? nonTrump : hand);
 }
 
 /**
@@ -177,4 +238,58 @@ function highestCard(cards) {
 function safeDiscard(hand) {
   const zeroPt = hand.filter(c => POINT_VALUE[c.rank] === 0);
   return lowestCard(zeroPt.length ? zeroPt : hand);
+}
+
+// ── Claim solver (§8) ───────────────────────────────────────────────────────────
+
+/**
+ * Double-dummy adjudication of a SOLO claim: returns true iff the single seat
+ * `claimSeat` can win EVERY remaining trick *by itself* against the best play of
+ * all three other seats (including its own partner — you can never claim tricks
+ * your partner's cards would win). Full knowledge of all hands (engine knows the
+ * concealed trump).
+ *
+ *   hands        — array[seat] = remaining cards for that seat
+ *   currentTrick — cards already played in the in-progress trick
+ *   toPlay       — seat to move next
+ *   trumpSuit    — active trump (null for No Trump)
+ *   claimSeat    — the lone claimant seat (0-3)
+ *   seatsInPlay  — active seats this hand (3 in Single Hand, else 4)
+ *
+ * Hard pruning (any trick the claimant doesn't personally win fails the line),
+ * capped at MAX_NODES; on the cap it conservatively returns false.
+ */
+function claimHolds(hands, currentTrick, toPlay, trumpSuit, claimSeat, seatsInPlay) {
+  const numSeats   = seatsInPlay.length;
+  const nextInPlay = (s) => seatsInPlay[(seatsInPlay.indexOf(s) + 1) % numSeats];
+  const MAX_NODES  = 200000;
+  let nodes = 0;
+
+  function rec(hs, trick, seat) {
+    if (++nodes > MAX_NODES) return { capped: true, ok: false };
+
+    if (trick.length === numSeats) {
+      const winner = trickWinner(trick, trumpSuit);
+      if (winner !== claimSeat) return { ok: false };   // claimant must win it personally
+      const remaining = seatsInPlay.reduce((n, s) => n + hs[s].length, 0);
+      if (remaining === 0) return { ok: true };
+      return rec(hs, [], winner);
+    }
+
+    const led        = trick.length ? trick[0].card.suit : null;
+    const legal      = legalPlays(hs[seat], led);
+    const maximizing = seat === claimSeat;   // only the claimant tries to win
+
+    for (const card of legal) {
+      const hs2 = hs.slice();
+      hs2[seat] = hs[seat].filter(c => !sameCard(c, card));
+      const res = rec(hs2, trick.concat([{ playerIndex: seat, card }]), nextInPlay(seat));
+      if (res.capped) return res;
+      if (maximizing && res.ok)  return { ok: true };    // claimant has a winning line
+      if (!maximizing && !res.ok) return { ok: false };  // someone else can break it
+    }
+    return { ok: !maximizing };
+  }
+
+  return rec(hands, currentTrick.slice(), toPlay).ok;
 }

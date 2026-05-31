@@ -31,59 +31,89 @@ html, body {
   position: relative;
 }
 
-/* ── Score bar ───────────────────────────────────────────────────────────────── */
-#score-bar {
+/* ── Top toolbar ─────────────────────────────────────────────────────────────── */
+#top-toolbar {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 6px 14px;
-  background: rgba(0,0,0,0.45);
-  flex-shrink: 0;
-  gap: 8px;
-  height: 40px;
+  height: 30px; flex-shrink: 0; padding: 0 12px;
+  background: #0b0b0d; color: #e5e7eb;
+}
+#app-title { font-weight: 800; font-size: 0.95rem; letter-spacing: 0.04em; }
+#toolbar-icons { display: flex; gap: 4px; }
+.tb-btn {
+  background: transparent; border: none; color: #cbd5e1; cursor: pointer;
+  font-size: 1rem; width: 30px; height: 24px; border-radius: 6px; line-height: 1;
+}
+.tb-btn:hover { background: rgba(255,255,255,0.12); color: #fff; }
+
+/* ── Felt (play surface) ─────────────────────────────────────────────────────── */
+#felt {
+  flex: 1; position: relative;
+  background: radial-gradient(ellipse at center, #1a7a44 0%, #14633a 70%, #0f4a29 100%);
+  display: flex; flex-direction: column; overflow: hidden;
 }
 
-.score-chip {
-  border-radius: 20px; padding: 2px 12px;
-  font-weight: 700; font-size: 0.85rem;
-  white-space: nowrap;
+/* Left status panel + right scoreboard — overlaid on the felt's top corners */
+#status-panel, #scoreboard {
+  position: absolute; top: 6px; z-index: 5;
+  background: rgba(0,0,0,0.34); border-radius: 8px; padding: 5px 8px;
+  font-size: 0.7rem; line-height: 1.4; color: #e5e7eb;
 }
-.score-chip.team0 { border: 2px solid #4ade80; color: #4ade80; }
-.score-chip.team1 { border: 2px solid #f87171; color: #f87171; }
-#bid-label { font-size: 0.75rem; color: #a3e635; text-align: center; flex: 1; }
+#status-panel { left: 6px; min-width: 96px; }
+#scoreboard   { right: 6px; min-width: 120px; }
+.sp-row { display: flex; justify-content: space-between; gap: 10px; }
+.sp-lbl { color: #94a3b8; }
+.sp-val { font-weight: 700; color: #fde047; }
+#trump-indicator { display: flex; align-items: center; gap: 6px; margin-top: 5px; }
+#trump-card-slot { width: 26px; height: 38px; }
+#trump-card-slot .card { width: 26px; height: 38px; border-radius: 3px; }
+#trump-nt { font-weight: 700; color: #c4b5fd; font-size: 0.72rem; }
 
-/* ── Info bar (points + trump + status) ─────────────────────────────────────── */
-#info-bar {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 3px 14px;
-  background: rgba(0,0,0,0.3);
-  flex-shrink: 0; height: 30px; gap: 6px;
+.sb-row { display: grid; grid-template-columns: 1fr 30px 30px; gap: 3px; text-align: right; }
+.sb-row .sb-cap { text-align: left; color: #94a3b8; }
+.sb-head { font-weight: 700; }
+.sb-head span:nth-child(2) { color: #4ade80; }
+.sb-head span:nth-child(3) { color: #f87171; }
+.sb-sub { color: #64748b; font-size: 0.6rem; margin: 2px 0; text-transform: uppercase; letter-spacing: 0.05em; }
+#sb-score0, #sb-need0, #sb-taken0 { color: #4ade80; font-weight: 700; }
+#sb-score1, #sb-need1, #sb-taken1 { color: #f87171; font-weight: 700; }
+
+/* Turn-direction arrow */
+#turn-arrow {
+  position: absolute; z-index: 4; width: 0; height: 0;
+  border-left: 12px solid transparent; border-right: 12px solid transparent;
+  border-top: 18px solid #22c55e;
+  filter: drop-shadow(0 0 4px rgba(34,197,94,0.85));
+  transition: top 0.25s, left 0.25s, transform 0.25s;
 }
 
-#pts-team0, #pts-team1 {
-  font-size: 0.78rem; font-weight: 700;
-}
-#pts-team0 { color: #4ade80; }
-#pts-team1 { color: #f87171; }
-#pts-bid-target {
-  font-size: 0.75rem; color: #fde047; text-align: center; flex: 1;
+/* Hand-over reveal banner (over the felt, clear of the cards) */
+#reveal-banner {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  z-index: 60; background: rgba(15,23,42,0.94); border: 1px solid #fde047;
+  color: #fde047; font-weight: 700; font-size: 0.92rem;
+  padding: 10px 22px; border-radius: 12px; text-align: center;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.55); max-width: 72%;
 }
 
-/* ── Status bar ─────────────────────────────────────────────────────────────── */
+/* Status line (bottom of the felt) */
 #status-bar {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 3px 14px;
-  background: rgba(0,0,0,0.25);
-  flex-shrink: 0; height: 28px; gap: 6px;
+  flex-shrink: 0; height: 20px;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  padding: 0 12px; background: rgba(0,0,0,0.28);
 }
-#status-msg { font-size: 0.8rem; color: rgba(255,255,255,0.8); flex: 1; }
-#trump-badge {
-  font-size: 0.75rem; font-weight: 700; padding: 1px 10px;
-  border-radius: 10px; white-space: nowrap;
+#status-msg { font-size: 0.72rem; color: rgba(255,255,255,0.85); }
+#claim-btn {
+  font-size: 0.68rem; font-weight: 700; padding: 1px 10px;
+  border: 1px solid #4ade80; border-radius: 10px;
+  background: rgba(74,222,128,0.18); color: #4ade80; cursor: pointer; white-space: nowrap;
 }
-.trump-badge.visible       { background: rgba(253,224,71,0.18); color: #fde047; border: 1px solid #fde047; }
-.trump-badge.hidden-trump  { background: rgba(255,255,255,0.07); color: #9ca3af; }
-.trump-badge.no-trump      { background: rgba(200,200,255,0.12); color: #c4b5fd; border: 1px solid #c4b5fd; }
-.trump-badge.suit-hearts,
-.trump-badge.suit-diamonds { color: #f87171; border-color: #f87171; background: rgba(248,113,113,0.12); }
+#claim-btn:hover { background: rgba(74,222,128,0.34); }
+
+@keyframes revealFlash {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(253,224,71,0); }
+  50%      { box-shadow: 0 0 0 3px #fde047, 0 0 14px 4px rgba(253,224,71,0.8); }
+}
+.reveal-flash { animation: revealFlash 0.5s ease-in-out 3; }
 
 /* ── Table grid ─────────────────────────────────────────────────────────────── */
 #table {
@@ -133,45 +163,23 @@ html, body {
 .card {
   width: var(--card-w); height: var(--card-h);
   border-radius: 6px;
-  border: 1px solid rgba(255,255,255,0.15);
+  border: 1px solid rgba(0,0,0,0.25);
   flex-shrink: 0;
   position: relative;
+  overflow: hidden;                 /* clip SVG to rounded border */
+  background: #fff;                 /* white face behind the SVG */
   transition: transform 0.12s, box-shadow 0.12s;
   user-select: none;
 }
 
-/* Face-down back */
+/* Face-down back: smaller for opponents' fanned hands */
 .card.face-down {
-  background: repeating-linear-gradient(
-    135deg, #1d4ed8 0px, #1d4ed8 6px, #1e40af 6px, #1e40af 12px
-  );
-  border-color: #93c5fd;
   width: var(--card-w-sm); height: var(--card-h-sm);
 }
 
-/* Face-up front */
-.card.face-up {
-  background: #fff;
-  display: flex; align-items: center; justify-content: center;
-}
-
-/* ── Card content (two-corner layout) ───────────────────────────────────────── */
-.corner {
-  position: absolute;
-  display: flex; flex-direction: column; align-items: center;
-  line-height: 1.1;
-}
-.corner-tl { top: 3px; left: 4px; }
-.corner-br { bottom: 3px; right: 4px; transform: rotate(180deg); }
-.c-rank { font-size: 0.82rem; font-weight: 900; line-height: 1; }
-.c-suit { font-size: 0.65rem; line-height: 1; }
-.card-center { font-size: 1.55rem; line-height: 1; pointer-events: none; }
-
-/* Suit colours */
-.suit-hearts  .corner, .suit-hearts  .card-center,
-.suit-diamonds .corner, .suit-diamonds .card-center { color: var(--red); }
-.suit-spades  .corner, .suit-spades  .card-center,
-.suit-clubs   .corner, .suit-clubs   .card-center  { color: var(--black); }
+/* CardMeister <playing-card> (renders an <img>) fills the whole card cell */
+.card playing-card { width: 100%; height: 100%; display: block; }
+.card playing-card img { width: 100%; height: 100%; display: block; }
 
 /* States */
 .card.trump-card { box-shadow: 0 0 0 2px #fde047; }
@@ -211,37 +219,71 @@ html, body {
 .trick-slot.trick-winner  { animation: winFlash 0.9s ease-in-out; border-radius: 8px; }
 .player-label.trick-winner { color: #fde047 !important; font-weight: 900 !important; }
 
-/* ── Overlay panels ─────────────────────────────────────────────────────────── */
+/* ── Overlay panels (confined below the toolbar, compact, centered) ──────────── */
 .overlay-panel {
-  position: absolute; inset: 0;
-  background: rgba(0,0,0,0.62);
+  position: absolute; top: 30px; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.30);   /* light dim so the cards stay readable behind */
   display: flex; align-items: center; justify-content: center;
   z-index: 100;
 }
 
 .panel-card {
-  background: #1e293b; border-radius: 14px;
-  padding: 24px 28px; max-width: 340px; width: 90%;
+  background: #1e293b; border-radius: 12px;
+  padding: 16px 20px; max-width: 320px; width: 86%;
+  max-height: 86%; overflow-y: auto;
   text-align: center;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+  box-shadow: 0 16px 48px rgba(0,0,0,0.6);
 }
-.panel-card h2 { font-size: 1.1rem; margin-bottom: 6px; color: #f1f5f9; }
-.panel-card p  { font-size: 0.85rem; color: #94a3b8; margin-bottom: 16px; }
+.panel-card-compact { max-width: 300px; padding: 12px 16px; }
+.panel-card h2 { font-size: 1rem; margin-bottom: 6px; color: #f1f5f9; }
+.panel-card p  { font-size: 0.8rem; color: #94a3b8; margin-bottom: 12px; }
 
-.btn { padding: 9px 20px; border: none; border-radius: 9px; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: background 0.15s; }
+.btn { padding: 8px 18px; border: none; border-radius: 9px; font-size: 0.86rem; font-weight: 600; cursor: pointer; transition: background 0.15s; }
 .btn-primary   { background: #6366f1; color: #fff; }
 .btn-primary:hover   { background: #4f46e5; }
-.btn-secondary { background: #334155; color: #e2e8f0; margin-left: 8px; }
+.btn-secondary { background: #334155; color: #e2e8f0; }
 .btn-secondary:hover { background: #475569; }
+.bid-actions { display: flex; justify-content: center; gap: 8px; }
+.single-hand-row { margin-top: 10px; }
+.btn-single { background: #b45309; color: #fff; width: 100%; font-size: 0.8rem; }
+.btn-single:hover { background: #92400e; }
 
-/* Bidding */
-#bid-row { display: flex; justify-content: center; align-items: center; gap: 10px; margin-bottom: 14px; }
-#bid-amount {
-  width: 68px; padding: 7px; font-size: 1.1rem; font-weight: 700;
-  border: 2px solid #475569; border-radius: 8px; text-align: center;
-  background: #0f172a; color: #f1f5f9; outline: none;
+/* Bidding stepper */
+#bid-row { display: flex; justify-content: center; align-items: center; gap: 8px; margin-bottom: 12px; }
+.step-btn {
+  width: 34px; height: 34px; border-radius: 8px; border: none;
+  background: #334155; color: #fff; font-size: 1.2rem; font-weight: 800; cursor: pointer;
 }
-#bid-amount:focus { border-color: #6366f1; }
+.step-btn:hover { background: #475569; }
+#bid-amount {
+  width: 60px; padding: 6px; font-size: 1.2rem; font-weight: 800;
+  border: 2px solid #475569; border-radius: 8px; text-align: center;
+  background: #0f172a; color: #fde047; outline: none;
+}
+#pass-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Auction grid (W/N/E/S × rounds) */
+#auction-grid { margin-bottom: 12px; }
+.auction-table { width: 100%; border-collapse: collapse; font-size: 0.74rem; }
+.auction-table th { color: #cbd5e1; font-weight: 700; padding: 2px 4px; border-bottom: 1px solid rgba(255,255,255,0.14); }
+.auction-table td { padding: 2px 4px; text-align: center; color: #e2e8f0; height: 18px; }
+.auction-table .ac-pass { color: #64748b; }
+.auction-table .ac-bid  { color: #fde047; font-weight: 700; }
+.auction-table .ac-sh   { color: #fb923c; font-weight: 800; }
+.auction-table th.ac-you, .auction-table td.ac-you { background: rgba(99,102,241,0.16); }
+
+/* Rules / Help */
+#rules-tabs { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; justify-content: center; }
+.rules-tab { padding: 5px 10px; border-radius: 8px; border: 1px solid #334155; background: #0f172a; color: #cbd5e1; font-size: 0.72rem; cursor: pointer; }
+.rules-tab.active { background: #6366f1; color: #fff; border-color: #6366f1; }
+#rules-body { text-align: left; font-size: 0.75rem; color: #e2e8f0; line-height: 1.5; max-height: 290px; overflow-y: auto; margin-bottom: 14px; }
+#rules-body h3 { font-size: 0.82rem; color: #fde047; margin: 8px 0 4px; }
+#rules-body ul { margin: 0 0 6px 16px; }
+#rules-body li { margin-bottom: 3px; }
+#rules-body b { color: #fff; }
+
+/* Scorecard panel reuses .history-table */
+#scorecard-history { max-height: 320px; overflow-y: auto; margin: 8px 0 14px; }
 
 /* Trump select */
 .suit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px; }
@@ -263,9 +305,19 @@ html, body {
 
 /* Match over */
 #match-winner-text { font-size: 1.25rem; font-weight: 700; color: #fde047; margin-bottom: 6px; }
+.panel-card-wide { max-width: 620px; width: 94%; }
+#match-history { max-height: 320px; overflow-y: auto; margin: 10px 0 16px; }
+.history-table { width: 100%; border-collapse: collapse; font-size: 0.72rem; }
+.history-table th, .history-table td { padding: 4px 6px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.08); white-space: nowrap; }
+.history-table th { color: #94a3b8; font-weight: 700; position: sticky; top: 0; background: #1e293b; }
+.history-table td { color: #e2e8f0; }
+.history-table .h-team { color: #64748b; font-size: 0.66rem; }
+.history-table .h-mar { color: #fde047; font-weight: 700; }
+.history-table .h-pos { color: #4ade80; font-weight: 700; }
+.history-table .h-neg { color: #f87171; font-weight: 700; }
 
 /* ── Pair prompt (toast, not full overlay) ─────────────────────────────────── */
-#pair-prompt {
+#marriage-prompt {
   position: absolute; bottom: 60px; left: 50%; transform: translateX(-50%);
   background: #1e293b; border: 2px solid #fde047;
   border-radius: 12px; padding: 12px 18px;
@@ -273,4 +325,4 @@ html, body {
   box-shadow: 0 8px 32px rgba(0,0,0,0.5);
   min-width: 280px;
 }
-#pair-prompt p { font-size: 0.85rem; color: #fde047; margin-bottom: 10px; font-weight: 600; }
+#marriage-prompt p { font-size: 0.85rem; color: #fde047; margin-bottom: 10px; font-weight: 600; }
