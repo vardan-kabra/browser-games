@@ -84,15 +84,6 @@ html, body {
 #sb-score0, #sb-need0, #sb-taken0 { color: #4ade80; font-weight: 700; }
 #sb-score1, #sb-need1, #sb-taken1 { color: #f87171; font-weight: 700; }
 
-/* Turn-direction arrow */
-#turn-arrow {
-  position: absolute; z-index: 4; width: 0; height: 0;
-  border-left: 12px solid transparent; border-right: 12px solid transparent;
-  border-top: 18px solid #22c55e;
-  filter: drop-shadow(0 0 4px rgba(34,197,94,0.85));
-  transition: top 0.25s, left 0.25s, transform 0.25s;
-}
-
 /* Hand-over reveal banner (over the felt, clear of the cards) */
 #reveal-banner {
   position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
@@ -118,13 +109,14 @@ html, body {
   display: flex; flex-direction: column; gap: 6px; align-items: flex-end;
 }
 #action-chips button {
-  font-size: 0.7rem; font-weight: 700; padding: 3px 12px;
+  font-size: 0.7rem; font-weight: 700; padding: 4px 0;
   border-radius: 12px; cursor: pointer; white-space: nowrap;
+  width: 92px; text-align: center; border: none; color: #fff;   /* filled + equal width */
 }
-#claim-btn  { border: 1px solid #4ade80; background: rgba(74,222,128,0.2);  color: #4ade80; }
-#claim-btn:hover { background: rgba(74,222,128,0.36); }
-#giveup-btn { border: 1px solid #f87171; background: rgba(248,113,113,0.2); color: #f87171; }
-#giveup-btn:hover { background: rgba(248,113,113,0.36); }
+#claim-btn  { background: #16a34a; }
+#claim-btn:hover { background: #15803d; }
+#giveup-btn { background: #dc2626; }
+#giveup-btn:hover { background: #b91c1c; }
 
 @keyframes revealFlash {
   0%, 100% { box-shadow: 0 0 0 0 rgba(253,224,71,0); }
@@ -148,7 +140,9 @@ html, body {
 }
 
 /* ── Seat wrappers ───────────────────────────────────────────────────────────── */
-#seat-top   { grid-area: top;   display: flex; flex-direction: column; align-items: center; gap: 3px; }
+/* North spans all three columns, so reserve horizontal gutters for the absolute side
+   panels (status-panel ~left, scoreboard ~right) — the fan never reaches them (Issue 1). */
+#seat-top   { grid-area: top;   display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 0 138px; }
 #seat-left  { grid-area: left;  display: flex; flex-direction: column; align-items: center; justify-content: center; }
 #seat-right { grid-area: right; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 #seat-human { grid-area: human; display: flex; flex-direction: column; align-items: center; gap: 3px; }
@@ -171,9 +165,12 @@ html, body {
 }
 #hand-0, #hand-2 { flex-direction: row; }
 
-/* Side AIs: stacked with overlap */
+/* Side AIs: stacked with overlap. Face-up review hands (full-size cards) use a tighter
+   overlap so the 8-card stack + label stays clear of the top corner panels (Issue 8);
+   face-down play hands (small cards) keep the looser overlap. */
 #hand-1, #hand-3 { flex-direction: column; gap: 0; position: relative; }
-#hand-1 .card, #hand-3 .card { margin-bottom: -40px; }
+#hand-1 .card, #hand-3 .card { margin-bottom: -60px; }
+#hand-1 .card.face-down, #hand-3 .card.face-down { margin-bottom: -40px; }
 #hand-1 .card:last-child, #hand-3 .card:last-child { margin-bottom: 0; }
 
 /* ── Cards ───────────────────────────────────────────────────────────────────── */
@@ -205,9 +202,11 @@ html, body {
 .card.unplayable { opacity: 0.62; }   /* still readable — just de-emphasised vs. legal plays */
 
 /* ── Center area (trick zone) ───────────────────────────────────────────────── */
+/* Transparent so it blends into the felt (no separate dark box), sized to hug the
+   4-card plus-cluster (Issue 4). */
 #center-area {
-  width: 220px; height: 200px;
-  background: rgba(0,0,0,0.22);
+  width: 182px; height: 184px;
+  background: transparent;
   border-radius: 14px;
   display: grid;
   grid-template-areas:
@@ -366,10 +365,15 @@ html, body {
   .card { width: 14vw; height: 20.3vw; border-radius: 1.4vw; }
   .card.face-down { width: 11vw; height: 16vw; }
   #trump-card-slot, #trump-card-slot .card { width: 8vw; height: 11.6vw; }
+  /* Mobile: keep every South card fully readable — distinguish legal plays by the green
+     border + a subtle raise rather than by dimming the rest (Issue 2). */
+  .card.unplayable { opacity: 1; }
+  #hand-0 .card.playable { transform: translateY(-1.6vw); z-index: 2; }
 
   /* overlapping fans so all 8 cards fit the width / height */
   #hand-0 .card { margin-left: -6vw; }                 /* South fan */
-  #hand-2 .card { margin-left: -9vw; }                 /* North fan — tighter, to clear the panels */
+  #hand-2 .card { margin-left: -10.5vw; }              /* North face-up review — clears the panels */
+  #hand-2 .card.face-down { margin-left: -9vw; }       /* North face-down play (narrower already) */
   #hand-0 .card:first-child, #hand-2 .card:first-child { margin-left: 0; }
   #hand .hand, #hand-0, #hand-2 { gap: 0; }            /* no extra gap on top of the overlap */
   #hand-1 .card, #hand-3 .card { margin-bottom: -12vw; }
@@ -382,9 +386,9 @@ html, body {
     padding: 1.5vw 1.5vw 3vw 1.5vw;
     gap: 1vw;
   }
-  /* push the South fan up off the screen edge so the bottom-right indices are visible */
-  #seat-human { padding-bottom: 2vw; justify-content: flex-end; }
-  #center-area { width: 46vw; height: 46vw; }
+  /* push the South fan up off the screen edge so full cards (incl. bottom indices) show */
+  #seat-human { padding-bottom: 6vw; justify-content: flex-end; }
+  #center-area { width: 36vw; height: 38vw; }
   .trick-slot { width: 14vw; height: 20.3vw; }
 
   /* compact info panels flanking the North fan */
@@ -413,9 +417,8 @@ html, body {
   .btn-shlink { font-size: 2.6vw; }
   .bid-hint { font-size: 2.6vw; }
 
-  /* floating chips, banners, arrow */
+  /* floating chips + banners */
   #action-chips { right: 2vw; bottom: 28vw; gap: 1.5vw; }
-  #action-chips button { font-size: 3vw; padding: 1.2vw 3vw; }
+  #action-chips button { font-size: 3vw; padding: 1.4vw 0; width: 24vw; }
   #reveal-banner, #toast { font-size: 3.4vw; max-width: 86vw; padding: 2.5vw 5vw; }
-  #turn-arrow { border-left-width: 3.5vw; border-right-width: 3.5vw; border-top-width: 5vw; }
 }

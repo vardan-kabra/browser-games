@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>29 — Card Game</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=6" />
 </head>
 <body>
 
@@ -52,9 +52,6 @@
     <!-- Transient event toast (trump revealed / claim / marriage) -->
     <div id="toast" hidden></div>
 
-    <!-- Turn-direction arrow -->
-    <div id="turn-arrow" hidden></div>
-
   <!-- ── Card table ─────────────────────────────────────────────────────────── -->
   <div id="table">
 
@@ -96,7 +93,7 @@
 
     <!-- Floating action chips (shown on the human's turn) -->
     <div id="action-chips">
-      <button id="giveup-btn" onclick="onGiveUp()" hidden>Give Up</button>
+      <button id="giveup-btn" onclick="onGiveUp()" hidden>Concede</button>
       <button id="claim-btn" onclick="onClaim()" hidden>Claim</button>
     </div>
 
@@ -220,8 +217,8 @@
 </div><!-- #game-root -->
 
 <script src="elements.cardmeister.full.js?v=cm1"></script>
-<script src="cards.js?v=5"></script>
-<script src="ai.js?v=5"></script>
-<script src="game.js?v=5"></script>
+<script src="cards.js?v=6"></script>
+<script src="ai.js?v=6"></script>
+<script src="game.js?v=6"></script>
 </body>
 </html>

@@ -16,6 +16,10 @@ const MIN_BID      = 16;
 const MATCH_TARGET = 6;
 const AI_DELAY_MS  = 750;
 
+// "tap" on touch devices, "click" on pointer devices — for user-facing copy.
+const POINTER_VERB = (typeof matchMedia === 'function' &&
+  matchMedia('(hover: none) and (pointer: coarse)').matches) ? 'tap' : 'click';
+
 // Togglable rule options (seed of a future settings screen). Flip a flag to switch a rule.
 const RULE_OPTIONS = {
   doubleRedouble: false,      // Double/Redouble window (×2/×4). Off: bid tiers grade stakes.
@@ -578,7 +582,7 @@ function advancePlay() {
 
   updateTrickArea();
   setStatus(isHuman(state.activePlayer)
-    ? 'Your turn — click a card to play.'
+    ? `Your turn — ${POINTER_VERB} a card to play.`
     : `${seatName(state.activePlayer)} is thinking…`);
 
   if (isHuman(state.activePlayer)) {
@@ -748,19 +752,19 @@ function resolveTrick() {
   state.currentTrick = [];
   state.activePlayer = winner;
 
-  // Flash the winning trick slot and label
+  // Flash the winning card + label WITH all four cards still on the table, then collect
+  // the trick in the timeout — so the glow highlights the winning card, not an empty slot.
   const winSlot  = document.getElementById(`trick-slot-${winner}`);
   const winLabel = document.getElementById(`label-${winner}`);
   winSlot?.classList.add('trick-winner');
   winLabel?.classList.add('trick-winner');
+  setStatus(`${seatName(winner)} wins the trick (+${pts} pts). Trick ${state.trickCount}/8`);
+  renderInfo();
   setTimeout(() => {
     winSlot?.classList.remove('trick-winner');
     winLabel?.classList.remove('trick-winner');
+    updateTrickArea();   // clear the collected trick (currentTrick already emptied)
   }, 900);
-
-  setStatus(`${seatName(winner)} wins the trick (+${pts} pts). Trick ${state.trickCount}/8`);
-  updateTrickArea();
-  renderInfo();
 
   // Single Hand (§9): the declarer must win ALL tricks, so the instant a defender takes
   // one the contract is broken — end the hand now instead of playing on.
@@ -944,6 +948,7 @@ function finishHand() {
   const actual = state.trickPoints[declarerTeam];
   const banner = (bidMade ? '✅ ' : '❌ ') +
     `${TEAM_NAMES[declarerTeam]} ${bidMade ? 'made' : 'fell short of'} ${effectiveBid} — took ${actual}`;
+  setStatus(banner);   // override any lingering "… is thinking…" / claim status (Issue 9)
   concludeHand(banner, () => {
     if (matchOver()) renderMatchOver();
     else renderHandResult(bidMade, declarerTeam, effectiveBid, swing);
@@ -1016,7 +1021,6 @@ function concludeHand(resultBanner, showPanel) {
 function renderAll() {
   renderInfo();
   renderTrumpIndicator();
-  renderTurnArrow();
   for (let i = 0; i < 4; i++) renderHand(i);
   updateTrickArea();
   renderPhase();
@@ -1089,18 +1093,6 @@ function renderTrumpIndicator() {
   }
   if (!state.trumpSuit) return;
   slot.appendChild(createCardEl({ rank: '3', suit: state.trumpSuit }, state.trumpRevealed));
-}
-
-// Green "your turn" arrow — shown ONLY on the human's turn, just above the South hand.
-function renderTurnArrow() {
-  const arrow = document.getElementById('turn-arrow');
-  if (!arrow) return;
-  const yourTurn = state.phase === PHASE.PLAYING && state.activePlayer === 0 && !isSittingOut(0);
-  if (!yourTurn) { arrow.hidden = true; return; }
-  arrow.hidden = false;
-  arrow.style.left = '50%';
-  arrow.style.top  = '78%';
-  arrow.style.transform = 'translate(-50%,-50%) rotate(0deg)';   // point down at your hand
 }
 
 function renderHand(seat) {
@@ -1205,10 +1197,9 @@ function renderBiddingPanel() {
            ${canRaise ? `<button class="btn btn-secondary" onclick="humanRaise()">Raise</button>` : ''}
            <button class="btn btn-secondary" onclick="humanBidAction('pass')">Pass</button>`;
   } else {                                            // slot-open or vs-challenger: human is the challenger
-    const label = state.bidStage === 'slot-open' ? 'Challenge' : 'Raise';
     row = canRaise
       ? `${stepper(cb + 1)}
-         <button class="btn btn-primary" onclick="humanRaise()">${label}</button>
+         <button class="btn btn-primary" onclick="humanRaise()">Raise</button>
          <button class="btn btn-secondary" onclick="humanBidAction('pass')">Pass</button>`
       : `<span class="bid-hint">At the 29 cap — Single Hand or pass.</span>
          <button class="btn btn-secondary" onclick="humanBidAction('pass')">Pass</button>`;
@@ -1258,16 +1249,18 @@ function renderAuctionGrid() {
 function renderHandResult(bidMade, declarerTeam, effectiveBid, swing) {
   const dName  = TEAM_NAMES[declarerTeam];
   const actual = state.trickPoints[declarerTeam];
+  // Show the DECLARED bid, with the marriage-adjusted target spelled out separately —
+  // never substitute the adjusted target for the bid (the tier follows the declared bid).
   const pairNote = state.marriageDeclared
-    ? ` (marriage ${state.marriageAdj > 0 ? '+' : ''}${state.marriageAdj})`
+    ? ` (marriage ${state.marriageAdj > 0 ? '+' : ''}${state.marriageAdj} → needed ${effectiveBid})`
     : '';
   const ntNote = state.isNoTrump ? ' [No Trump]' : '';
   const stakeNote = state.stakeMultiplier === 4 ? ' ×4 redoubled'
                   : state.stakeMultiplier === 2 ? ' ×2 doubled' : '';
   const gp = `${swing} game pt${swing > 1 ? 's' : ''}`;
   const result = bidMade
-    ? `✅ ${dName} made it — bid ${effectiveBid}${pairNote}${ntNote}, took ${actual}. +${gp}${stakeNote}.`
-    : `❌ ${dName} fell short — bid ${effectiveBid}${pairNote}${ntNote}, took ${actual}. −${gp}${stakeNote}.`;
+    ? `✅ ${dName} made it — bid ${state.highBid}${pairNote}${ntNote}, took ${actual}. +${gp}${stakeNote}.`
+    : `❌ ${dName} fell short — bid ${state.highBid}${pairNote}${ntNote}, took ${actual}. −${gp}${stakeNote}.`;
   setText('hand-result-text', result);
   setText('hand-score-team0', `${TEAM_NAMES[0]}: ${state.gameScore[0]}`);
   setText('hand-score-team1', `${TEAM_NAMES[1]}: ${state.gameScore[1]}`);
@@ -1293,6 +1286,7 @@ function finishSingleHand() {
   setPhase(PHASE.HAND_SCORING);
   const banner = (wonAll ? '🏆 ' : '💥 ') +
     `${seatName(state.declarer)} ${wonAll ? 'won all 8 — Single Hand made' : 'dropped a trick — Single Hand failed'}`;
+  setStatus(banner);   // override any lingering "… is thinking…" status (Issue 9)
   concludeHand(banner, () => {
     if (matchOver()) renderMatchOver();
     else renderSingleHandResult(wonAll);
