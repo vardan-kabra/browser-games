@@ -34,7 +34,7 @@
 
 ## 3. Bidding (asymmetric holder-match model)
 
-> The full mechanic — terms, flow, and worked examples — is in **`29 Bidding Logic Update.md`** (the source of truth for bidding). Summary:
+> The full mechanic — terms, flow, and worked examples — is in **`29 Championship AI and Mechanics Spec.md`** (Part A), the source of truth for bidding. Summary:
 
 - Bidding happens **after** each player has seen their full 8-card hand. Range **16–29**; **Single Hand** sits above 29 (§9).
 - The **opener** (player to the dealer's right) is **forced to open at 16** (or declare Single Hand) and may **not** pass.
@@ -49,27 +49,33 @@
 
 ## 4. Trump Selection & Concealment
 
+> Full detail in **`29 Championship AI and Mechanics Spec.md`** (Part B), the source of truth for trump reveal & ruffing. Summary:
+
 - The winning bidder secretly chooses a **trump suit** or declares **No Trump**.
-- The choice is **held hidden by the system** — no card is removed from anyone's hand, and the bidder plays all 8 cards normally.
-- A **low-rank indicator card** (e.g. 3♣) represents the chosen suit on screen. It is **cosmetic only**: it is not part of the 32-card deck, is never dealt or played, and exists purely to show "trump = clubs" more clearly than a text label. It appears face-down while concealed and face-up when revealed. **No Trump** is shown as a "No Trump" label (there is no suit to depict).
-- During the concealed phase, the bidder **may not lead the trump suit**.
-- *Default (UI, to confirm during build):* a named trump suit must be one the bidder actually holds at least one card in.
+- The choice is **held hidden by the system** and known **only to the bidder** (not even the bidder's partner) — no card is removed from anyone's hand, and the bidder plays all 8 cards normally.
+- A **low-rank indicator card** (e.g. 3♣) represents the chosen suit on screen. It is **cosmetic only**: not part of the 32-card deck, never dealt or played, and exists purely to show "trump = clubs" more clearly than a text label. It appears face-down while concealed and face-up after the reveal. **No Trump** is shown as a "No Trump" label.
+- While concealed the trump is **inert** — it cannot win a trick. **Anyone may lead any suit, including the (concealed) trump suit**; leading it does **not** reveal it (a trump-suit trick plays like any other — highest of the led suit wins).
+- *Default (UI):* a named trump suit must be one the bidder actually holds at least one card in.
 
 ---
 
-## 5. Play — The Two Phases
+## 5. Play — Reveal-to-ruff (manual)
 
-**Phase 1 — before the trump is revealed**
-- Trumps are inactive. Each trick is won by the **highest card of the led suit**.
+**Before any reveal**
+- Trump is inactive. Each trick is won by the **highest card of the led suit**.
 - Players **must follow the led suit** if able.
-- A player who **cannot follow suit** may **call for the trump to be revealed**. On reveal, the trump is exposed; that player must then **play a trump if they hold one** (otherwise they discard).
+- A player **void in the led suit** may use the **"Reveal Trump"** action — the *only* way trump is ever revealed, and **only to ruff**. On reveal the trump is exposed (and wakes for the rest of the hand); that player **must then play a trump if they hold one** (the ruff), otherwise they discard.
+- A void player who does **not** reveal simply discards. A trump-suit card thrown without revealing is **inert** — it does not ruff, win, or reveal anything.
+- When the **led suit *is* the trump suit**, a player void in it holds no trump, so there is nothing to reveal — the trick plays out on highest-of-led-suit.
 
-**Phase 2 — after the trump is revealed**
-- The **highest trump** in a trick wins it. Tricks containing no trump are won by the **highest card of the led suit**.
+**After the first reveal (trump active for everyone)**
+- The **highest trump** in a trick wins it; tricks with no trump are won by the **highest card of the led suit**.
+- A void player **may trump or discard** — ruffing is **not** forced.
 
 **Notes**
-- There is **no "invalid if never revealed" rule** — a hand always plays out. If the trump is never revealed (no one is void, or no one calls), trumps simply never activate and the whole hand is decided on highest-of-led-suit.
-- **No Trump rounds:** the choice is concealed like a suit; calling the reveal merely confirms "No Trump," and play continues on highest-of-led-suit for all 8 tricks.
+- **No one — bidder included — can activate trump proactively.** Trump only wakes on the first ruff-reveal.
+- There is **no "invalid if never revealed" rule** — a hand always plays out. If no one ever reveals, trump never activates and the whole hand is decided on highest-of-led-suit.
+- **No Trump / Single Hand:** No Trump has nothing to reveal (highest-of-led throughout); Single Hand's trump is open from the start.
 
 ---
 

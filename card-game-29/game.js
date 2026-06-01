@@ -38,14 +38,18 @@ const RULES_HTML = [
    <h3>Play</h3>
    <ul>
      <li>All 8 cards are dealt at once. You must <b>follow the led suit</b> if you can.</li>
-     <li>A trick is won by the highest trump, else the highest card of the led suit.</li>
+     <li>Trump starts <b>hidden &amp; inert</b> — each trick goes to the highest card of the led suit. If you're <b>void</b> in the led suit you may press <b>Reveal Trump</b> to ruff.</li>
+     <li>Once revealed, a trick is won by the highest trump, else the highest card of the led suit.</li>
    </ul>`,
   // 1 — Rules & Scoring
-  `<h3>Hidden Trump</h3>
+  `<h3>Hidden Trump &amp; Reveal-to-ruff</h3>
    <ul>
-     <li>The bid winner secretly picks a trump suit (or No Trump). It stays hidden until a player
-         can't follow suit or a trump is played — then it's revealed and active.</li>
-     <li>The declarer may not lead the concealed trump.</li>
+     <li>The bid winner secretly picks a trump suit (or No Trump), known only to them. While hidden it is
+         <b>inert</b> — it can't win a trick, and anyone (the bidder included) may lead it without revealing it.</li>
+     <li>If you <b>can't follow</b> the led suit you may press <b>Reveal Trump</b> to ruff — the only way trump is ever
+         revealed. You must then play a trump if you hold one; otherwise you discard. A trump thrown <i>without</i>
+         revealing is just an ordinary card.</li>
+     <li>The first reveal wakes trump for everyone for the rest of the hand. If no one ever reveals, trump never activates.</li>
    </ul>
    <h3>Marriage (K + Q of trump)</h3>
    <ul>
@@ -71,6 +75,7 @@ const RULES_HTML = [
          same number to keep the contract); the challenger must keep <b>raising</b>. The duel ends when one
          side stops — the holder, by matching, has the edge.</li>
      <li>Bids run 16–29; Single Hand sits above 29.</li>
+     <li>The winner names a trump suit (or No Trump), kept <b>concealed and inert</b> until a void player reveals it to ruff.</li>
    </ul>
    <h3>No Trump</h3>
    <ul><li>Played with no trump — every trick is won by the highest card of the led suit.</li></ul>
@@ -106,6 +111,7 @@ let state = {
   trumpSuit:     null,
   trumpRevealed: false,
   isNoTrump:     false,
+  forceTrumpOnly: false,        // human chose Reveal-to-ruff → bound to play a trump this turn
 
   // Royal pair
   marriageAdj: 0,
@@ -123,6 +129,7 @@ let state = {
   reviewMode:      null,     // null | 'remaining' (claim preview) | 'original' (open all hands)
 
   // Play
+  resolving:        false,        // true during the 1s pause after a trick fills (input locked)
   tricks:           [],
   currentTrick:     [],
   trickPoints:      [0, 0],
@@ -154,6 +161,13 @@ function seatName(seat) {
 }
 function nextSeat(seat) { return (seat + 1) % 4; }
 function isHuman(seat)  { return seat === 0; }
+
+// Trump is INERT until the manual ruff-reveal (Part B1/B4) — only after that is it
+// active for trick adjudication. No Trump and Single Hand are unaffected (NT has no
+// trump; SH starts with trumpRevealed=true).
+function effectiveTrump() {
+  return (state.isNoTrump || !state.trumpRevealed) ? null : state.trumpSuit;
+}
 
 // In a Single Hand (§9) the declarer's partner sits out, so only 3 seats play.
 function sittingOutSeat() {
@@ -214,6 +228,7 @@ function startHand() {
   state.trumpSuit      = null;
   state.trumpRevealed  = false;
   state.isNoTrump      = false;
+  state.forceTrumpOnly = false;
   state.marriageAdj = 0;
   state.marriageDeclared   = false;
   state.marriageHolder     = null;
@@ -224,6 +239,7 @@ function startHand() {
   state.soloSeat       = null;
   state.tricksWonBy    = [0, 0];
   state.reviewMode     = null;
+  state.resolving      = false;
   state.tricks         = [];
   state.currentTrick   = [];
   state.trickPoints    = [0, 0];
@@ -293,19 +309,44 @@ function bidStep() {
 
 function doAIBid() {
   const seat = state.currentBidder, hand = state.hands[seat];
-  const cb = state.highBid, value = aiBidValue(hand);
-  const canRaise = cb < 29;
+  const cb = state.highBid, canRaise = cb < 29;
+  // Challenger-side value (slot-open / vs-challenger): holder is the current high bidder.
+  // Applies the C2 partner rule + C12 score-lean.
+  const challengerValue = aiBidValueAgainstHolder(hand, state.highBidder, seat, state.gameScore);
+  // Holder-side value is the plain ceiling with score-lean (holder defends its own bid).
+  const holderValue     = aiBidValue(hand, scoreLeanFor(seat));
   switch (state.bidStage) {
     case 'open':
-      return aiShouldSingleHand(hand) ? applyBidAction(seat, 'sh') : applyBidAction(seat, 'open16');
+      // Single Hand only on a near-lock; otherwise the forced 16. No partner rule on the open.
+      return aiShouldSingleHand(hand, seat, state.gameScore)
+        ? applyBidAction(seat, 'sh') : applyBidAction(seat, 'open16');
     case 'slot-open':
-      if (aiShouldSingleHand(hand)) return applyBidAction(seat, 'sh');
-      return (value > cb && canRaise) ? applyBidAction(seat, 'challenge', cb + 1) : applyBidAction(seat, 'pass');
-    case 'vs-holder':                                   // this seat is the holder
-      return (value >= cb) ? applyBidAction(seat, 'match') : applyBidAction(seat, 'pass');
+      if (aiShouldSingleHand(hand, seat, state.gameScore)) return applyBidAction(seat, 'sh');
+      return (challengerValue > cb && canRaise)
+        ? applyBidAction(seat, 'challenge', cb + 1)
+        : applyBidAction(seat, 'pass');
+    case 'vs-holder':                                   // this seat is the holder, responding
+      // Facing one's own partner as challenger: retain (keep trump) through the support
+      // band, and concede only if partner pushes past it (a take-over) — per C2.
+      if (state.challenger !== null && _samePartnershipSeats(state.challenger, seat))
+        return (cb <= AI_TUNING.partner.supportMax)
+          ? applyBidAction(seat, 'match') : applyBidAction(seat, 'pass');
+      return (holderValue >= cb) ? applyBidAction(seat, 'match') : applyBidAction(seat, 'pass');
     case 'vs-challenger':                               // this seat is the challenger
-      return (value > cb && canRaise) ? applyBidAction(seat, 'raise', cb + 1) : applyBidAction(seat, 'pass');
+      return (challengerValue > cb && canRaise)
+        ? applyBidAction(seat, 'raise', cb + 1)
+        : applyBidAction(seat, 'pass');
   }
+}
+
+// Thin wrappers around the ai.js helpers so we can call them with game.js's state.
+function _samePartnershipSeats(a, b) { return teamOf(a) === teamOf(b); }
+function scoreLeanFor(seat) {
+  if (!state.gameScore) return 0;
+  const mine = state.gameScore[teamOf(seat)] || 0;
+  if (mine >= 5)  return -1;     // ahead — bid conservatively
+  if (mine <= -5) return +1;     // behind — bid aggressively
+  return 0;
 }
 
 // Human entry point (called from the dynamic bid controls).
@@ -541,10 +582,12 @@ function advancePlay() {
     : `${seatName(state.activePlayer)} is thinking…`);
 
   if (isHuman(state.activePlayer)) {
+    state.forceTrumpOnly = false;
     renderHand(0);
     const canAct = !isSittingOut(0);
     show('claim-btn', canAct && tricksRemaining() >= 2);   // claim needs ≥2 tricks (§8)
     show('giveup-btn', canAct);                            // give up available any turn
+    maybePromptHumanReveal();                              // void + concealed trump → ask (Part B3)
   } else {
     show('claim-btn', false);
     show('giveup-btn', false);
@@ -572,18 +615,27 @@ function doAIPlay() {
   const knownTrump = (state.trumpRevealed || seat === state.declarer)
     ? state.trumpSuit : null;
 
+  // Reveal-to-ruff (Part B3) — when void in led suit and trump still concealed, ask
+  // the AI whether to reveal. On reveal, the AI MUST play a trump if it holds one.
   const ledSuit = state.currentTrick.length ? state.currentTrick[0].card.suit : null;
-  if (!state.isNoTrump && ledSuit && !state.trumpRevealed && seat !== state.declarer) {
-    const canFollow = state.hands[seat].some(c => c.suit === ledSuit);
-    if (!canFollow) revealTrump();
+  let mustRuffWithTrump = false;
+  if (!state.isNoTrump && ledSuit && !state.trumpRevealed && state.trumpSuit) {
+    const canFollow  = state.hands[seat].some(c => c.suit === ledSuit);
+    const ledIsTrump = ledSuit === state.trumpSuit;     // Part B6 — nothing to reveal
+    if (!canFollow && !ledIsTrump &&
+        aiShouldReveal(seat, state.hands[seat], state.currentTrick, state.declarer, knownTrump)) {
+      revealTrump();
+      mustRuffWithTrump = state.hands[seat].some(c => c.suit === state.trumpSuit);
+    }
   }
 
-  let card = aiPlayCard(state.hands[seat], state.currentTrick, knownTrump, state.declarer, seat);
-  // Declarer may not lead the concealed trump (§4) — redirect to a non-trump lead.
-  if (card && state.currentTrick.length === 0 && seat === state.declarer &&
-      !state.trumpRevealed && !state.isNoTrump && card.suit === state.trumpSuit) {
-    const nonTrump = state.hands[seat].filter(c => c.suit !== state.trumpSuit);
-    if (nonTrump.length) card = aiLead(nonTrump, null) || nonTrump[0];
+  let card;
+  if (mustRuffWithTrump) {
+    // Forced ruff — play the lowest trump card.
+    const trumps = state.hands[seat].filter(c => c.suit === state.trumpSuit);
+    card = lowestCard(trumps);
+  } else {
+    card = aiPlayCard(state.hands[seat], state.currentTrick, effectiveTrump(), state.declarer, seat);
   }
   if (!card) { console.warn(`${seatName(seat)} aiPlayCard returned null — skipping`); return; }
   playCard(seat, card);
@@ -591,41 +643,79 @@ function doAIPlay() {
 
 function humanPlayCard(card) {
   if (state.phase !== PHASE.PLAYING || !isHuman(state.activePlayer)) return;
+  // Ignore clicks during the trick-resolve pause (a full trick awaiting resolveTrick) —
+  // otherwise a fast second click would push a 5th card and corrupt the trick.
+  if (state.resolving || state.currentTrick.length >= trickSize()) return;
   const ledSuit = state.currentTrick.length ? state.currentTrick[0].card.suit : null;
   const legal   = legalPlays(state.hands[0], ledSuit);
   if (!legal.some(c => sameCard(c, card))) {
     setStatus('You must follow the led suit if you can!');
     return;
   }
-  // Rulebook §4: the declarer may not LEAD the concealed trump (it would reveal it).
-  if (!ledSuit && isHuman(state.declarer) && !state.isNoTrump &&
-      !state.trumpRevealed && card.suit === state.trumpSuit &&
-      state.hands[0].some(c => c.suit !== state.trumpSuit)) {
-    setStatus("You can't lead your concealed trump — lead another suit.");
-    return;
-  }
-
-  if (!state.isNoTrump && ledSuit && !state.trumpRevealed && !isHuman(state.declarer)) {
-    const canFollow = state.hands[0].some(c => c.suit === ledSuit);
-    if (!canFollow) revealTrump();
+  // If the human chose "Reveal Trump" while void, they are bound to ruff — play a
+  // trump if they hold one (Part B3).
+  if (state.forceTrumpOnly) {
+    if (card.suit !== state.trumpSuit) {
+      setStatus('You revealed trump — you must play a trump card.');
+      return;
+    }
+    state.forceTrumpOnly = false;
   }
 
   playCard(0, card);
+}
+
+// The active human is void in the led suit and trump is still concealed — let them
+// choose to reveal-and-ruff or simply discard (Part B3). Returns true if a prompt
+// was shown (so advancePlay should wait for the choice).
+function maybePromptHumanReveal() {
+  if (!revealApplicable(0)) return false;
+  // The prompt's overlay captures clicks; hide the floating chips behind it for clarity.
+  show('claim-btn', false);
+  show('giveup-btn', false);
+  show('reveal-prompt', true);
+  setStatus("You're void — reveal trump to ruff, or discard.");
+  return true;
+}
+
+// Shared gate for the void-player reveal option (human and AI). Applies only when a
+// suit was led that the seat cannot follow, trump exists and is still concealed, and
+// the led suit isn't the trump itself (Part B6 — nothing to reveal then).
+function revealApplicable(seat) {
+  if (state.isNoTrump || state.isSingleHand || state.trumpRevealed || !state.trumpSuit) return false;
+  const ledSuit = state.currentTrick.length ? state.currentTrick[0].card.suit : null;
+  if (!ledSuit || ledSuit === state.trumpSuit) return false;
+  return !state.hands[seat].some(c => c.suit === ledSuit);   // void in led suit
+}
+
+// Human pressed "Reveal Trump": expose trump, then bind them to ruff if they hold one.
+function onRevealTrump() {
+  show('reveal-prompt', false);
+  revealTrump();
+  state.forceTrumpOnly = state.hands[0].some(c => c.suit === state.trumpSuit);
+  renderHand(0);   // re-grey: only trump cards remain playable when forced
+  setStatus(state.forceTrumpOnly
+    ? 'Trump revealed — play a trump card to ruff.'
+    : 'Trump revealed — discard any card.');
+}
+
+// Human pressed "Discard": keep trump concealed, play any card (they're void).
+function onRevealDiscard() {
+  show('reveal-prompt', false);
+  state.forceTrumpOnly = false;
+  setStatus('Discard any card.');
+  renderHand(0);
 }
 
 function playCard(seat, card) {
   state.hands[seat] = state.hands[seat].filter(c => !sameCard(c, card));
   state.currentTrick.push({ playerIndex: seat, card });
 
-  // Playing a trump card reveals trump suit
-  if (!state.isNoTrump && !state.trumpRevealed && state.trumpSuit && card.suit === state.trumpSuit) {
-    revealTrump();
-  }
-
   renderHand(seat);
   renderTrickCard(seat, card);
 
   if (state.currentTrick.length === trickSize()) {
+    state.resolving = true;     // lock input during the 1s trick-resolve pause
     setTimeout(resolveTrick, 1000);
   } else {
     state.activePlayer = nextActiveSeat(seat);
@@ -647,7 +737,8 @@ function revealTrump() {
 }
 
 function resolveTrick() {
-  const winner = trickWinner(state.currentTrick, state.trumpSuit);
+  state.resolving = false;      // pause over — input unlocks for the next turn
+  const winner = trickWinner(state.currentTrick, effectiveTrump());
   const pts    = state.currentTrick.reduce((s, t) => s + POINT_VALUE[t.card.rank], 0);
   state.trickPoints[teamOf(winner)] += pts;
   state.tricksWonBy[teamOf(winner)]++;          // trick count per team (Marriage gating §6)
@@ -1025,14 +1116,13 @@ function renderHand(seat) {
   // The human's own cards are face-up — unless they are the Single Hand partner sitting
   // out. During review every hand is face-up.
   const faceUp  = reviewing || (seat === 0 && !isSittingOut(0));
-  let legal     = (!reviewing && seat === 0 && !isSittingOut(0) &&
+  let legal     = (!reviewing && seat === 0 && !isSittingOut(0) && !state.resolving &&
                    state.phase === PHASE.PLAYING && isHuman(state.activePlayer))
     ? legalPlays(state.hands[0], ledSuit) : [];
-  // Declarer may not lead the concealed trump — grey those cards out (§4).
-  if (legal.length && !ledSuit && isHuman(state.declarer) &&
-      !state.isNoTrump && !state.trumpRevealed) {
-    const nonTrump = legal.filter(c => c.suit !== state.trumpSuit);
-    if (nonTrump.length) legal = nonTrump;   // unless trump is all they hold
+  // After choosing Reveal-to-ruff, only trump cards are playable this turn (Part B3).
+  if (legal.length && state.forceTrumpOnly) {
+    const trumps = legal.filter(c => c.suit === state.trumpSuit);
+    if (trumps.length) legal = trumps;
   }
 
   sorted.forEach(card => {
