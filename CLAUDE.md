@@ -12,7 +12,7 @@ Open the entry HTML file in a browser (double-click, or `start <file>` on Window
 
 - **Tic Tac Toe** — `tic-tac-toe.html` (single self-contained file: markup, CSS, and JS are all inline)
 - **Bulls & Cows** — `bulls-and-cows/index.html` (split into `index.html`, `style.css`, `game.js`)
-- **29 Card Game** — `card-game-29/index.html` (split into `index.html`, `style.css`, `game.js`, `cards.js`, `ai.js`)
+- **29 Card Game** — `card-game-29/index.html` (split into `index.html`, `style.css`, `game.js`, `cards.js`, `ai.js`, `feedback.js`)
 
 ## Git / GitHub
 
@@ -77,12 +77,13 @@ State lives in one mutable `state` object; `state.phase` (`PHASE`) drives the ma
 - **End-of-hand review**: `state.dealtHands` snapshots the deal; at hand end `concludeHand` (no dark backdrop) opens every seat's ORIGINAL 8 cards face-up (`state.reviewMode='original'`); claimed/conceded hands first show the cards still held (`'remaining'`) for ~2.5s. The match-end scorecard is `renderHistoryTable` from `state.handHistory`.
 - **Deck**: cards render via the **CardMeister** custom element (`createCardEl`/`cardCid` → `<playing-card cid="8S">`), loaded from `elements.cardmeister.full.js` — crisp, bold, fully offline (data-URI SVG, works on `file://`).
 - **Layout**: an 800×600 landscape table (toolbar + felt + left status panel + right **We/They** Need/Taken scoreboard). `fitToViewport()` (load + resize) scales it on **wide** screens; on **portrait/narrow** it clears the transform and a `@media (max-aspect-ratio: 11/10)` block fills the viewport with **overlapping fan hands** (vw-sized). In-play events use `showToast` (center, auto-fade). Inline `onclick`/global functions, so handlers must stay in global scope.
+- **AI-feedback flagging** (`feedback.js` — `29 AI Feedback Flagging Spec.md`): a DOM-light data module `feedbackLog` (frozen global, statsStore-style) records a complete **per-hand move log** (deal, bidding, contract, marriage, trump reveal, every trick with seat-order plays + per-card roles `ledSuit/isTrump/inertTrump/winning`, running points, result + `endReason`), holds the player's **flags**, and assembles one self-describing JSON per hand via `buildExport()` (incl. `readme`, `rankOrderHighToLow`, `readableSummary`). game.js feeds it via ~9 one-line hooks (`beginMatch` in `startMatch`; `beginHand` in `startHand`; `setContract/setBidding/setTargets` in `beginPlay`; `logPlay` in `playCard`; `logTrickResolved` in `resolveTrick`; `logReveal` from `revealTrump(byWhom)`; `logMarriage` in `declareMarriage`; `noteEnd` in `acceptClaim`/`onGiveUp`/SH-break; `logResult` in `finishHand`/`finishSingleHand`) — game logic never reads back from it. The UI (game.js) is the 🚩 toolbar button + `#flag-panel` bottom-sheet (`renderFlagPanel`: anchor-trick stepper, related-trick chips, note, Save/Cancel, flags list, Export) kept **below the played cards** (capped `max-height`), plus an Export button on Hand Over. Flags persist in **localStorage** (`cg29-fb-<matchId>-h<n>`); export is a **Blob download** (`29-feedback-hand-N.json`). The move log is full-knowledge (true trump from the start); seats serialize as S/E/N/W, suits as S/H/D/C. **R2 (deferred):** tap-to-pin the exact card (`subjectPlay`, currently always `null`) + per-trick table markers. When changing scoring/trick/reveal/marriage logic, keep the corresponding `feedbackLog.log*` hook in sync.
 
 ## Card Game 29 — Conventions
 
 **Rulebook sync (IMPORTANT):** whenever you change any Card Game 29 rule, scoring, or contract logic, update BOTH the canonical `card-game-29/29 Card Game Rulebook.md` (source of truth) AND the in-game Rules screen (`RULES_HTML` in `game.js`, three tabs: Basic Play / Rules & Scoring / Bidding & Contracts) so the player-facing rulebook never drifts from the code.
 
-**Cache-busting:** `index.html` loads scripts with `?v=N`; bump it when you change `game.js`/`ai.js`/`cards.js`/`style.css` so browsers refetch. The root `service-worker.js` is **network-first** (CACHE `browser-games-v2`) so the online (GitHub Pages) build updates immediately for players; bump CACHE if you ever need to force-purge.
+**Cache-busting:** `index.html` loads scripts with `?v=N`; bump it when you change `game.js`/`ai.js`/`cards.js`/`feedback.js`/`style.css` so browsers refetch. The root `service-worker.js` is **network-first** (CACHE `browser-games-v2`) so the online (GitHub Pages) build updates immediately for players; bump CACHE if you ever need to force-purge.
 
 **Verification:** raster screenshots of the heavy card DOM time out, so verify by driving the page via DOM/state inspection rather than screenshots.
 

@@ -191,10 +191,14 @@ function trickSize() { return state.isSingleHand ? 3 : 4; }
 
 // ── Entry points ──────────────────────────────────────────────────────────────
 
+let matchId = null;
+
 function startMatch() {
   state.gameScore = [0, 0];
   state.handHistory = [];
   state.dealer = 3;
+  matchId = 'm-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+  feedbackLog.beginMatch(matchId);
   startHand();
 }
 
@@ -218,6 +222,16 @@ function startHand() {
   const deck = shuffle(buildDeck());
   state.hands = dealHands(deck);
   state.dealtHands = state.hands.map(h => h.map(c => ({ ...c })));   // snapshot for review
+
+  // Start a fresh move log for this hand (AI-feedback feature).
+  feedbackLog.beginHand({
+    number: state.handHistory.length + 1,
+    dealer: state.dealer,
+    seatingOrderCCW: ['S', 'E', 'N', 'W'],
+    deal: state.dealtHands,
+    scoreBefore: [state.gameScore[0], state.gameScore[1]],
+  });
+  updateFlagBadge();
 
   state.bidOrder       = [0, 1, 2, 3].map(i => (state.dealer + 1 + i) % 4);
   state.eliminated     = [false, false, false, false];
@@ -569,6 +583,16 @@ async function beginDoubleWindow() {
 // ── Play phase ────────────────────────────────────────────────────────────────
 
 function beginPlay() {
+  // Capture the finalized contract into the move log (AI-feedback feature).
+  feedbackLog.setBidding(state.bidLog);
+  feedbackLog.setContract({
+    bidder: state.declarer, declaredBid: state.highBid, trump: state.trumpSuit,
+    isNoTrump: state.isNoTrump, singleHand: state.isSingleHand, soloSeat: state.soloSeat,
+    double: state.stakeMultiplier === 4 ? 'redouble' : state.stakeMultiplier === 2 ? 'double' : 'none',
+  });
+  feedbackLog.setTargets(state.isSingleHand ? null
+    : { biddingTeamNeed: state.highBid, defenseNeed: 30 - state.highBid });
+
   // Single Hand: the declarer leads the first trick. Otherwise play opens to the
   // dealer's right.
   state.activePlayer = state.isSingleHand ? state.soloSeat : nextSeat(state.dealer);
@@ -631,7 +655,7 @@ function doAIPlay() {
     const ledIsTrump = ledSuit === state.trumpSuit;
     if (!canFollow && !ledIsTrump &&
         aiShouldReveal(seat, state.hands[seat], state.currentTrick, state.declarer, knownTrump)) {
-      revealTrump();
+      revealTrump(seat);
       mustRuffWithTrump = state.hands[seat].some(c => c.suit === state.trumpSuit);
     }
   }
@@ -700,7 +724,7 @@ function revealApplicable(seat) {
 // Human pressed "Reveal Trump": expose trump, then bind them to ruff if they hold one.
 function onRevealTrump() {
   show('reveal-prompt', false);
-  revealTrump();
+  revealTrump(0);
   state.forceTrumpOnly = state.hands[0].some(c => c.suit === state.trumpSuit);
   renderHand(0);   // re-grey: only trump cards remain playable when forced
   setStatus(state.forceTrumpOnly
@@ -717,6 +741,19 @@ function onRevealDiscard() {
 }
 
 function playCard(seat, card) {
+  // Move-log capture (AI-feedback): record the play with its roles, using full knowledge
+  // of the (possibly still-concealed) trump.
+  const isLead    = state.currentTrick.length === 0;
+  const ledSuitOf = isLead ? card.suit : state.currentTrick[0].card.suit;
+  const isTrumpC  = !state.isNoTrump && state.trumpSuit && card.suit === state.trumpSuit;
+  feedbackLog.logPlay({
+    leader: isLead ? seat : state.currentTrick[0].playerIndex,
+    seat, card,
+    ledSuit: card.suit === ledSuitOf,
+    isTrump: !!isTrumpC,
+    inertTrump: !!isTrumpC && !state.trumpRevealed,
+  });
+
   state.hands[seat] = state.hands[seat].filter(c => !sameCard(c, card));
   state.currentTrick.push({ playerIndex: seat, card });
 
@@ -732,9 +769,11 @@ function playCard(seat, card) {
   }
 }
 
-function revealTrump() {
+function revealTrump(byWhom) {
   if (state.isNoTrump || state.trumpRevealed) return;
   state.trumpRevealed = true;
+  // Move-log capture (AI-feedback): who revealed, at which (in-progress) trick.
+  feedbackLog.logReveal({ atTrick: state.tricks.length + 1, by: byWhom == null ? state.declarer : byWhom, suit: state.trumpSuit });
   renderTrumpIndicator();
   setStatus(`🔔 TRUMP REVEALED — ${SUIT_SYMBOL[state.trumpSuit]} ${state.trumpSuit.toUpperCase()}!`);
   const ind = document.getElementById('trump-card-slot');
@@ -754,6 +793,11 @@ function resolveTrick() {
   state.lastTrickWinner = winner;
   state.tricks.push({ winner, cards: state.currentTrick.map(t => t.card) });
   state.trickCount++;
+  // Move-log capture (AI-feedback): finalize this trick (+1 on the normal-hand last trick).
+  feedbackLog.logTrickResolved({
+    trickNumber: state.trickCount, winner, cardPoints: pts,
+    isLastTrick: !state.isSingleHand && state.trickCount === 8,
+  });
   state.currentTrick = [];
   state.activePlayer = winner;
 
@@ -775,6 +819,7 @@ function resolveTrick() {
   // one the contract is broken — end the hand now instead of playing on.
   if (state.isSingleHand && winner !== state.soloSeat) {
     setStatus(`${seatName(winner)} takes a trick — Single Hand is broken!`);
+    feedbackLog.noteEnd({ reason: 'single-hand-broken', atTrick: state.trickCount, by: winner, awardedToTeam: teamOf(winner) });
     if (advanceTimeout !== null) { clearTimeout(advanceTimeout); advanceTimeout = null; }
     setTimeout(finishHand, 1300);
     return;
@@ -817,6 +862,12 @@ function declareMarriage(seat) {
   setStatus(`${seatName(seat)} declares the Marriage (K+Q of trump)! ${dir}`);
   showToast(`💍 ${seatName(seat)} declares Marriage — ${dir}`);
   hideMarriagePrompt();
+  // Move-log capture (AI-feedback): marriage timing + the re-adjusted targets.
+  {
+    const newNeed = Math.max(15, Math.min(29, state.highBid + state.marriageAdj));
+    feedbackLog.logMarriage({ atTrick: state.trickCount, by: seat, adj: state.marriageAdj,
+      targets: { biddingTeamNeed: newNeed, defenseNeed: 30 - newNeed } });
+  }
   renderInfo();
 }
 
@@ -896,6 +947,7 @@ function awardRemaining(toTeam, banner) {
 // A solo claim by `claimSeat` — that seat wins every remaining trick by itself.
 function acceptClaim(claimSeat) {
   const t = tricksRemaining();
+  feedbackLog.noteEnd({ reason: 'claim', atTrick: state.tricks.length + 1, by: claimSeat, awardedToTeam: teamOf(claimSeat) });
   awardRemaining(teamOf(claimSeat),
     `★ ${seatName(claimSeat)} claims the remaining ${t} ${t === 1 ? 'trick' : 'tricks'} — accepted!`);
 }
@@ -905,6 +957,7 @@ function onGiveUp() {
   if (state.phase !== PHASE.PLAYING || !isHuman(state.activePlayer)) return;
   const toTeam = 1 - teamOf(0);
   const t = tricksRemaining();
+  feedbackLog.noteEnd({ reason: 'concede', atTrick: state.tricks.length + 1, by: 0, awardedToTeam: toTeam });
   awardRemaining(toTeam,
     `🏳 South gives up — ${TEAM_NAMES[toTeam]} take the remaining ${t} ${t === 1 ? 'trick' : 'tricks'}.`);
 }
@@ -947,6 +1000,14 @@ function finishHand() {
     took:     state.trickPoints[declarerTeam],
     result:   bidMade ? 'Made' : 'Set',
     delta:    bidMade ? swing : -swing,
+  });
+
+  // Move-log capture (AI-feedback): final result (endReason set earlier by claim/concede).
+  feedbackLog.logResult({
+    biddingTeamPoints: state.trickPoints[declarerTeam], made: bidMade,
+    tier: state.highBid <= 20 ? '16-20' : state.highBid <= 27 ? '21-27' : '28-29',
+    gamePointsAwarded: bidMade ? swing : -swing, multiplier: state.stakeMultiplier,
+    scoreAfter: [state.gameScore[0], state.gameScore[1]],
   });
 
   setPhase(PHASE.HAND_SCORING);
@@ -1288,6 +1349,12 @@ function finishSingleHand() {
     result:   wonAll ? 'Made' : 'Set',
     delta:    wonAll ? 6 : -6,
   });
+  // Move-log capture (AI-feedback): Single Hand result (±6, no tier/target).
+  feedbackLog.logResult({
+    biddingTeamPoints: state.tricksWonBy[declTeam], made: wonAll, tier: 'single-hand',
+    gamePointsAwarded: wonAll ? 6 : -6, multiplier: 1,
+    scoreAfter: [state.gameScore[0], state.gameScore[1]],
+  });
   setPhase(PHASE.HAND_SCORING);
   const banner = (wonAll ? '🏆 ' : '💥 ') +
     `${seatName(state.declarer)} ${wonAll ? 'won all 8 — Single Hand made' : 'dropped a trick — Single Hand failed'}`;
@@ -1373,6 +1440,122 @@ function onShowScorecard() {
   show('scorecard-panel', true);
 }
 function onCloseScorecard() { show('scorecard-panel', false); }
+
+// ── AI-feedback flagging (UI layer; data lives in feedback.js) ──────────────────
+let flagDraft = { anchor: 1, related: [], note: '', editingId: null };
+
+function escHtml(s) {
+  return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+// The trick to anchor a flag to: the in-progress trick during play, else the last
+// completed one (min 1). Also the upper bound for the anchor/related selectors.
+function currentTrickNo() {
+  const done = state.tricks ? state.tricks.length : 0;
+  const inProgress = state.currentTrick && state.currentTrick.length ? 1 : 0;
+  return Math.max(1, done + inProgress);
+}
+function updateFlagBadge() {
+  const n = feedbackLog.flagCount();
+  const el = document.getElementById('flag-count');
+  if (el) { el.textContent = n; el.hidden = n === 0; }
+}
+function onShowFlags() {
+  if (!feedbackLog.hasHand()) { setStatus('Nothing to flag yet — deal a hand first.'); return; }
+  flagDraft = { anchor: currentTrickNo(), related: [], note: '', editingId: null };
+  renderFlagPanel();
+  show('flag-panel', true);
+}
+function onCloseFlags() { show('flag-panel', false); }
+function syncFlagDraft() {
+  const ta = document.getElementById('flag-note');
+  if (ta) flagDraft.note = ta.value;
+}
+function onFlagAnchorStep(d) {
+  syncFlagDraft();
+  flagDraft.anchor = Math.max(1, Math.min(currentTrickNo(), flagDraft.anchor + d));
+  renderFlagPanel();
+}
+function onToggleRelated(n) {
+  syncFlagDraft();
+  const i = flagDraft.related.indexOf(n);
+  if (i >= 0) flagDraft.related.splice(i, 1); else flagDraft.related.push(n);
+  flagDraft.related.sort((a, b) => a - b);
+  renderFlagPanel();
+}
+function onSaveFlag() {
+  syncFlagDraft();
+  if (!flagDraft.note.trim()) { const ta = document.getElementById('flag-note'); if (ta) ta.classList.add('flag-need'); return; }
+  if (flagDraft.editingId) {
+    feedbackLog.updateFlag(flagDraft.editingId, { anchorTrick: flagDraft.anchor, relatedTricks: flagDraft.related, note: flagDraft.note.trim() });
+  } else {
+    feedbackLog.addFlag({ anchorTrick: flagDraft.anchor, relatedTricks: flagDraft.related, note: flagDraft.note.trim() });
+  }
+  flagDraft = { anchor: currentTrickNo(), related: [], note: '', editingId: null };
+  updateFlagBadge();
+  renderFlagPanel();
+}
+function onEditFlag(id) {
+  const f = feedbackLog.getFlags().find(x => x.id === id);
+  if (!f) return;
+  flagDraft = { anchor: f.anchorTrick, related: (f.relatedTricks || []).slice(), note: f.note, editingId: id };
+  renderFlagPanel();
+}
+function onDeleteFlag(id) { feedbackLog.deleteFlag(id); updateFlagBadge(); renderFlagPanel(); }
+
+function renderFlagPanel() {
+  const body = document.getElementById('flag-body');
+  if (!body) return;
+  const cur = currentTrickNo();
+  if (flagDraft.anchor > cur) flagDraft.anchor = cur;
+  let chips = '';
+  for (let n = 1; n <= cur; n++) {
+    chips += `<button class="flag-chip${flagDraft.related.includes(n) ? ' on' : ''}" onclick="onToggleRelated(${n})">${n}</button>`;
+  }
+  const flags = feedbackLog.getFlags();
+  const list = flags.length ? flags.map(f => {
+    const rel = f.relatedTricks && f.relatedTricks.length ? ` · rel ${f.relatedTricks.join(',')}` : '';
+    return `<div class="flag-row">
+        <span class="flag-row-t">T${f.anchorTrick}${rel}</span>
+        <span class="flag-row-note">${escHtml(f.note)}</span>
+        <button class="flag-mini" onclick="onEditFlag('${f.id}')">Edit</button>
+        <button class="flag-mini flag-del" onclick="onDeleteFlag('${f.id}')">✕</button>
+      </div>`;
+  }).join('') : '<div class="flag-empty">No flags yet this hand.</div>';
+
+  body.innerHTML = `
+    <div class="flag-head">
+      <b>${flagDraft.editingId ? 'Edit flag' : 'Flag a trick'}</b>
+      <span class="flag-sub">Hand ${feedbackLog.getHandNumber() ?? '–'} · ${flags.length} flag${flags.length === 1 ? '' : 's'}</span>
+      <button class="flag-x" title="Close" onclick="onCloseFlags()">✕</button>
+    </div>
+    <div class="flag-line"><span class="flag-lbl">Trick</span>
+      <button class="step-btn" onclick="onFlagAnchorStep(-1)">−</button>
+      <span class="flag-anchor">${flagDraft.anchor}</span>
+      <button class="step-btn" onclick="onFlagAnchorStep(1)">+</button>
+    </div>
+    <div class="flag-line"><span class="flag-lbl">Related</span><span class="flag-chips">${chips || '<span class="flag-sub">—</span>'}</span></div>
+    <textarea id="flag-note" class="flag-note" placeholder="What went wrong here?">${escHtml(flagDraft.note)}</textarea>
+    <div class="bid-actions">
+      <button class="btn btn-primary" onclick="onSaveFlag()">${flagDraft.editingId ? 'Update' : 'Save'}</button>
+      <button class="btn btn-secondary" onclick="onCloseFlags()">Cancel</button>
+    </div>
+    <div class="flag-list">${list}</div>
+    <div class="bid-actions"><button class="btn btn-secondary" onclick="onExportFeedback()">⬇ Export feedback (hand ${feedbackLog.getHandNumber() ?? '–'})</button></div>`;
+}
+
+// Export one self-contained JSON file for this hand (Blob download).
+function onExportFeedback() {
+  if (!feedbackLog.hasHand()) { setStatus('Nothing to export yet.'); return; }
+  const data = feedbackLog.buildExport();
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `29-feedback-hand-${feedbackLog.getHandNumber()}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+  showToast('📄 Feedback file downloaded.');
+}
 
 // Rules / Help
 let rulesTab = 0;

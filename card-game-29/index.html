@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>29 — Card Game</title>
-  <link rel="stylesheet" href="style.css?v=7" />
+  <link rel="stylesheet" href="style.css?v=8" />
 </head>
 <body>
 
@@ -17,6 +17,7 @@
     <span id="app-title">29</span>
     <span id="status-msg"></span>
     <div id="toolbar-icons">
+      <button class="tb-btn" id="flag-btn" title="Flag a trick for AI feedback" onclick="onShowFlags()">🚩<span id="flag-count" hidden>0</span></button>
       <button class="tb-btn" title="Scorecard" onclick="onShowScorecard()">🗒</button>
       <button class="tb-btn" title="How to play" onclick="onShowRules()">?</button>
       <button class="tb-btn" title="New match" onclick="onNewMatch()">⟳</button>
@@ -153,6 +154,13 @@
     </div>
   </div>
 
+  <!-- ── AI-feedback flag panel (bottom sheet; body built by renderFlagPanel) ── -->
+  <div id="flag-panel" class="overlay-panel" hidden>
+    <div id="flag-sheet">
+      <div id="flag-body"></div>
+    </div>
+  </div>
+
   <!-- ── Royal pair prompt (toast, not full overlay) ───────────────────────── -->
   <div id="marriage-prompt" hidden>
     <p>You hold K+Q of trump — declare the Marriage?</p>
@@ -172,6 +180,10 @@
       <div class="bid-actions">
         <button class="btn btn-primary" onclick="onNextHand()">Next Hand</button>
         <button class="btn btn-secondary" onclick="onShowScorecard()">Scorecard</button>
+      </div>
+      <div class="bid-actions" style="margin-top:6px">
+        <button class="btn btn-secondary" onclick="onShowFlags()">Flag a trick</button>
+        <button class="btn btn-secondary" onclick="onExportFeedback()">Export feedback</button>
       </div>
     </div>
   </div>
@@ -214,8 +226,9 @@
 </div><!-- #game-root -->
 
 <script src="elements.cardmeister.full.js?v=cm1"></script>
-<script src="cards.js?v=7"></script>
-<script src="ai.js?v=7"></script>
-<script src="game.js?v=7"></script>
+<script src="cards.js?v=8"></script>
+<script src="ai.js?v=8"></script>
+<script src="feedback.js?v=8"></script>
+<script src="game.js?v=8"></script>
 </body>
 </html>
