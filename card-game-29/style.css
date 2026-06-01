@@ -350,6 +350,17 @@ html, body {
 }
 #marriage-prompt p { font-size: 0.85rem; color: #fde047; margin-bottom: 10px; font-weight: 600; }
 
+/* Void reveal prompt — a compact bar in the lower-centre (over the still-empty South trick
+   slot), below the played cards so the trick stays visible. The overlay stays full-felt and
+   transparent, so it still blocks card clicks until the player chooses. */
+#reveal-prompt { align-items: flex-end; }
+#reveal-box {
+  display: flex; gap: 8px; margin-bottom: 150px;
+  background: rgba(15,23,42,0.94); padding: 7px 9px; border-radius: 12px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.55);
+}
+#reveal-box .btn { padding: 6px 14px; font-size: 0.82rem; }
+
 /* ── Portrait / phone layout (overlapping fan hands, fluid fill) ───────────────── */
 @media (max-aspect-ratio: 11/10) {
   #game-root {
@@ -421,4 +432,8 @@ html, body {
   #action-chips { right: 2vw; bottom: 28vw; gap: 1.5vw; }
   #action-chips button { font-size: 3vw; padding: 1.4vw 0; width: 24vw; }
   #reveal-banner, #toast { font-size: 3.4vw; max-width: 86vw; padding: 2.5vw 5vw; }
+
+  /* void reveal prompt — lower-centre, above the taller portrait South fan */
+  #reveal-box { margin-bottom: 40vw; gap: 2vw; padding: 1.6vw 2vw; border-radius: 2vw; }
+  #reveal-box .btn { padding: 1.8vw 3.6vw; font-size: 3vw; }
 }

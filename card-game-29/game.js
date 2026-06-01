@@ -625,7 +625,10 @@ function doAIPlay() {
   let mustRuffWithTrump = false;
   if (!state.isNoTrump && ledSuit && !state.trumpRevealed && state.trumpSuit) {
     const canFollow  = state.hands[seat].some(c => c.suit === ledSuit);
-    const ledIsTrump = ledSuit === state.trumpSuit;     // Part B6 — nothing to reveal
+    // When led=trump the AI is void in trump too, so revealing can't ruff and only helps
+    // opponents — the AI declines (correct play; AI hands are hidden, so no info leak. The
+    // human, by contrast, is always offered the choice — see revealApplicable).
+    const ledIsTrump = ledSuit === state.trumpSuit;
     if (!canFollow && !ledIsTrump &&
         aiShouldReveal(seat, state.hands[seat], state.currentTrick, state.declarer, knownTrump)) {
       revealTrump();
@@ -682,13 +685,15 @@ function maybePromptHumanReveal() {
   return true;
 }
 
-// Shared gate for the void-player reveal option (human and AI). Applies only when a
-// suit was led that the seat cannot follow, trump exists and is still concealed, and
-// the led suit isn't the trump itself (Part B6 — nothing to reveal then).
+// Gate for the human void-player reveal option. Offered whenever a suit was led that the
+// seat cannot follow, trump exists and is still concealed — INCLUDING when the led suit is
+// the trump itself. Suppressing it there would deny a legitimate choice AND leak the trump's
+// identity (its absence would signal "led suit = trump"). When void in led=trump the player
+// holds no trump, so on reveal they simply discard (handled in onRevealTrump).
 function revealApplicable(seat) {
   if (state.isNoTrump || state.isSingleHand || state.trumpRevealed || !state.trumpSuit) return false;
   const ledSuit = state.currentTrick.length ? state.currentTrick[0].card.suit : null;
-  if (!ledSuit || ledSuit === state.trumpSuit) return false;
+  if (!ledSuit) return false;
   return !state.hands[seat].some(c => c.suit === ledSuit);   // void in led suit
 }
 

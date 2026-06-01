@@ -66,7 +66,7 @@
 - Players **must follow the led suit** if able.
 - A player **void in the led suit** may use the **"Reveal Trump"** action — the *only* way trump is ever revealed, and **only to ruff**. On reveal the trump is exposed (and wakes for the rest of the hand); that player **must then play a trump if they hold one** (the ruff), otherwise they discard.
 - A void player who does **not** reveal simply discards. A trump-suit card thrown without revealing is **inert** — it does not ruff, win, or reveal anything.
-- When the **led suit *is* the trump suit**, a player void in it holds no trump, so there is nothing to reveal — the trick plays out on highest-of-led-suit.
+- When the **led suit *is* the trump suit**, a void player is **still offered** Reveal Trump / Discard — suppressing it would deny a real choice and *leak the trump's identity* (its absence would signal "led suit = trump"). Revealing wakes trump for the rest of the hand, but since they hold no trump they simply discard; the current trick still resolves on highest-of-led-suit (which is the highest trump), so its winner is unchanged.
 
 **After the first reveal (trump active for everyone)**
 - The **highest trump** in a trick wins it; tricks with no trump are won by the **highest card of the led suit**.

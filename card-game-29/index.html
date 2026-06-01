@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>29 — Card Game</title>
-  <link rel="stylesheet" href="style.css?v=6" />
+  <link rel="stylesheet" href="style.css?v=7" />
 </head>
 <body>
 
@@ -144,15 +144,12 @@
   </div>
 
   <!-- ── Reveal-to-ruff prompt (void in led suit, trump still concealed) ─────── -->
+  <!-- Transparent overlay blocks card clicks; the compact bar sits BELOW the trick so the
+       played cards stay visible while deciding. Status bar carries the explanatory text. -->
   <div id="reveal-prompt" class="overlay-panel" hidden>
-    <div class="panel-card panel-card-compact">
-      <h2>You're void</h2>
-      <p>You can't follow suit. Reveal the trump to ruff (you must then play a trump),
-         or keep it hidden and discard.</p>
-      <div class="bid-actions">
-        <button class="btn btn-primary" onclick="onRevealTrump()">Reveal Trump</button>
-        <button class="btn btn-secondary" onclick="onRevealDiscard()">Discard</button>
-      </div>
+    <div id="reveal-box">
+      <button class="btn btn-primary" onclick="onRevealTrump()">Reveal Trump</button>
+      <button class="btn btn-secondary" onclick="onRevealDiscard()">Discard</button>
     </div>
   </div>
 
@@ -217,8 +214,8 @@
 </div><!-- #game-root -->
 
 <script src="elements.cardmeister.full.js?v=cm1"></script>
-<script src="cards.js?v=6"></script>
-<script src="ai.js?v=6"></script>
-<script src="game.js?v=6"></script>
+<script src="cards.js?v=7"></script>
+<script src="ai.js?v=7"></script>
+<script src="game.js?v=7"></script>
 </body>
 </html>

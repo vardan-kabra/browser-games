@@ -75,7 +75,13 @@ A trump card therefore functions as a trump **only after a conscious reveal.**
 - If **no ruff-reveal ever happens**, trump never activates and the whole hand is decided on highest-of-led-suit. (A hand is never invalidated for lack of a reveal.)
 
 ## B6. When the led suit *is* the trump suit
-A player void in that suit holds no trump, so there is nothing to reveal or ruff — the trick just plays out on the highest card of the led suit.
+*(Corrected — supersedes the original "don't offer it" assumption.)* A void player still
+cannot ruff (being void in the led suit = void in trump), **but the Reveal Trump / Discard
+choice must still be offered.** Suppressing it would deny a legitimate choice and, worse,
+**leak the hidden trump's identity** — the prompt's absence would signal "led suit = trump"
+to a non-bidder who has no way to know it. On reveal, the player holds no trump so they
+simply discard; the reveal still activates trump for the rest of the hand. The current trick
+resolves on the highest card of the led suit (= the highest trump), so its winner is unchanged.
 
 ## B7. After the reveal (trump active)
 A player void in the led suit **may trump or discard** — trumping is **not** forced. (See Part C's overtake rule.)
