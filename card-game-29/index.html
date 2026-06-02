@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>29 — Card Game</title>
-  <link rel="stylesheet" href="style.css?v=8" />
+  <link rel="stylesheet" href="style.css?v=9" />
 </head>
 <body>
 
@@ -17,6 +17,7 @@
     <span id="app-title">29</span>
     <span id="status-msg"></span>
     <div id="toolbar-icons">
+      <button class="tb-btn" id="cardstyle-btn" title="Card style: graphic — tap to switch" onclick="onToggleCardStyle()">🂠</button>
       <button class="tb-btn" id="flag-btn" title="Flag a trick for AI feedback" onclick="onShowFlags()">🚩<span id="flag-count" hidden>0</span></button>
       <button class="tb-btn" title="Scorecard" onclick="onShowScorecard()">🗒</button>
       <button class="tb-btn" title="How to play" onclick="onShowRules()">?</button>
@@ -226,9 +227,9 @@
 </div><!-- #game-root -->
 
 <script src="elements.cardmeister.full.js?v=cm1"></script>
-<script src="cards.js?v=8"></script>
-<script src="ai.js?v=8"></script>
-<script src="feedback.js?v=8"></script>
-<script src="game.js?v=8"></script>
+<script src="cards.js?v=9"></script>
+<script src="ai.js?v=9"></script>
+<script src="feedback.js?v=9"></script>
+<script src="game.js?v=9"></script>
 </body>
 </html>

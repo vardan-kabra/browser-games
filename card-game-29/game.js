@@ -1203,21 +1203,59 @@ const CM_RANK = { J:'J', '9':'9', A:'A', '10':'T', K:'K', Q:'Q', '8':'8', '7':'7
 const CM_SUIT = { spades:'S', hearts:'H', diamonds:'D', clubs:'C' };
 function cardCid(card) { return CM_RANK[card.rank] + CM_SUIT[card.suit]; }
 
+// Card rendering style: 'graphic' (CardMeister SVG) or 'text' (simple text card). Persisted.
+let cardStyle = (typeof localStorage !== 'undefined' && localStorage.getItem('cg29-card-style') === 'text')
+  ? 'text' : 'graphic';
+
 function createCardEl(card, faceUp) {
   const div = document.createElement('div');
   div.className = `card ${faceUp ? 'face-up' : 'face-down'}`;
   if (faceUp && state.trumpRevealed && !state.isNoTrump && state.trumpSuit === card.suit) {
     div.classList.add('trump-card');
   }
-  const pc = document.createElement('playing-card');
-  if (faceUp) {
-    pc.setAttribute('cid', cardCid(card));
+  if (cardStyle === 'text') {
+    buildTextCard(div, card, faceUp);
   } else {
-    pc.setAttribute('rank', '0');             // 0 = face-down back
-    pc.setAttribute('backcolor', '#0f7a3d');  // green back to match the felt
+    const pc = document.createElement('playing-card');
+    if (faceUp) {
+      pc.setAttribute('cid', cardCid(card));
+    } else {
+      pc.setAttribute('rank', '0');             // 0 = face-down back
+      pc.setAttribute('backcolor', '#0f7a3d');  // green back to match the felt
+    }
+    div.appendChild(pc);
   }
-  div.appendChild(pc);
   return div;
+}
+
+// Simple text card: corner indices (TL + BR-rotated) + a big centre, coloured red/black.
+// Face-down is a plain green back. Sizing is handled by container-query units in CSS.
+function buildTextCard(div, card, faceUp) {
+  div.classList.add('text-card');
+  if (!faceUp) { div.classList.add('text-back'); return; }
+  div.classList.add(SUIT_COLOR[card.suit]);   // 'red' | 'black'
+  const label = card.rank + SUIT_SYMBOL[card.suit];
+  div.innerHTML =
+    `<span class="tc-corner tc-tl">${label}</span>` +
+    `<span class="tc-center">${label}</span>` +
+    `<span class="tc-corner tc-br">${label}</span>`;
+}
+
+// Repaint every visible card surface (after a style switch) without touching game state.
+function repaintCards() {
+  for (let i = 0; i < 4; i++) renderHand(i);
+  renderTrumpIndicator();
+  updateTrickArea();
+}
+function updateCardStyleBtn() {
+  const btn = document.getElementById('cardstyle-btn');
+  if (btn) btn.title = `Card style: ${cardStyle === 'text' ? 'text' : 'graphic'} — tap to switch`;
+}
+function onToggleCardStyle() {
+  cardStyle = (cardStyle === 'text') ? 'graphic' : 'text';
+  try { localStorage.setItem('cg29-card-style', cardStyle); } catch (e) {}
+  updateCardStyleBtn();
+  repaintCards();
 }
 
 function updateTrickArea() {
@@ -1586,4 +1624,4 @@ window.addEventListener('resize', fitToViewport);
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 
-document.addEventListener('DOMContentLoaded', () => { fitToViewport(); startMatch(); });
+document.addEventListener('DOMContentLoaded', () => { fitToViewport(); updateCardStyleBtn(); startMatch(); });

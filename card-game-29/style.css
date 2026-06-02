@@ -201,6 +201,21 @@ html, body {
 .card.playable:hover { transform: translateY(-7px); box-shadow: 0 8px 18px rgba(0,0,0,0.4), 0 0 0 2px #4ade80; }
 .card.unplayable { opacity: 0.62; }   /* still readable — just de-emphasised vs. legal plays */
 
+/* ── Simple text cards (toolbar 🂠 toggle) — sized by container-query units so the
+   rank/suit auto-scale to each card box (hand, face-down sm, trump indicator, portrait vw) ── */
+.card.text-card { container-type: size; background: #fff; }
+.card.text-card.red   { color: var(--red, #c0392b); }
+.card.text-card.black { color: #111; }
+.tc-corner { position: absolute; font-weight: 800; line-height: 0.92; font-size: 23cqh; letter-spacing: -0.03em; }
+.tc-tl { top: 6cqh; left: 8cqw; }
+.tc-br { bottom: 6cqh; right: 8cqw; transform: rotate(180deg); }
+.tc-center { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 44cqh; letter-spacing: -0.04em; }
+.card.text-card.text-back { background: #0f7a3d; }                 /* green back, no text */
+.card.text-card.text-back::after {
+  content: ''; position: absolute; inset: 8cqh;
+  border: 1.5cqh solid rgba(255,255,255,0.4); border-radius: 5cqh;
+}
+
 /* ── Center area (trick zone) ───────────────────────────────────────────────── */
 /* Transparent so it blends into the felt (no separate dark box), sized to hug the
    4-card plus-cluster (Issue 4). */
