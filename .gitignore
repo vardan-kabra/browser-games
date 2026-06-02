@@ -12,3 +12,12 @@ node_modules/
 
 # Local scratch / test files
 _test.js
+
+# Atomic-write / editor temp files (e.g. CLAUDE.md.tmp.1234.abcd)
+*.tmp.*
+
+# Machine-specific Claude config (preview launch config has local paths/ports)
+.claude/launch.json
+
+# Working screenshots — kept on disk, not in the repo
+UI Screenshots/
