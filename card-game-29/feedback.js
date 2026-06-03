@@ -210,7 +210,8 @@ const feedbackLog = (() => {
       ? '\n\nFLAGS\n' + flags.map(f => {
           const subj = f.subjectPlay ? ` [subject: ${f.subjectPlay.seat} ${sym(card(f.subjectPlay.card))}]` : '';
           const rel = f.relatedTricks && f.relatedTricks.length ? ` [relates to: trick ${f.relatedTricks.join(', ')}]` : '';
-          return `- Trick ${f.anchorTrick}${subj}${rel}: "${f.note}"`;
+          const where = f.anchorTrick === 0 ? 'Bidding' : `Trick ${f.anchorTrick}`;   // anchorTrick 0 = the auction
+          return `- ${where}${subj}${rel}: "${f.note}"`;
         }).join('\n')
       : '';
     return `${head}\n\n${trickLines}${flagLines}`;

@@ -1175,8 +1175,12 @@ function renderHand(seat) {
   el.innerHTML = '';
   // Review modes (end of hand): 'original' opens every seat's ORIGINAL 8 cards;
   // 'remaining' opens the cards still held (claim/give-up preview). Otherwise normal play.
-  const reviewing = state.reviewMode === 'original' || state.reviewMode === 'remaining';
-  const source  = state.reviewMode === 'original' ? (state.dealtHands[seat] || []) : state.hands[seat];
+  // While the play-by-play review is OPEN, hands shrink trick-by-trick: each seat shows what
+  // it holds AFTER the trick in view (reviewHandAt), so the fans reduce as you step forward.
+  const reviewing = reviewOpen || state.reviewMode === 'original' || state.reviewMode === 'remaining';
+  const source  = reviewOpen
+    ? reviewHandAt(seat, reviewTrickIndex)
+    : (state.reviewMode === 'original' ? (state.dealtHands[seat] || []) : state.hands[seat]);
   const sorted  = sortHand(source);
   const ledSuit = state.currentTrick.length ? state.currentTrick[0].card.suit : null;
   // The human's own cards are face-up — unless they are the Single Hand partner sitting
@@ -1329,13 +1333,10 @@ function stepBid(delta) {
 }
 
 // Bridge-style auction grid: columns West · North · East · South, one row per round.
-function renderAuctionGrid() {
-  const el = document.getElementById('auction-grid');
-  if (!el) return;
+// The table HTML is built by auctionTableHTML() so the post-hand review can reuse it.
+function auctionTableHTML() {
   const COLS = [3, 2, 1, 0];                 // West, North, East, South (seat indices)
   const cells = COLS.map(() => []);          // calls per column, in round order
-  // Place each call under its bidder's column; a new row starts when a column repeats.
-  const rowFor = COLS.map(() => 0);
   state.bidLog.forEach(({ seat, call }) => {
     const ci = COLS.indexOf(seat);
     cells[ci].push(call);
@@ -1352,10 +1353,13 @@ function renderAuctionGrid() {
       return `<td class="${cls}${you}">${txt}</td>`;
     }).join('') + '</tr>';
   }
-  el.innerHTML =
-    `<table class="auction-table"><thead><tr>
+  return `<table class="auction-table"><thead><tr>
       <th>West</th><th>North</th><th>East</th><th class="ac-you">South</th>
     </tr></thead><tbody>${body}</tbody></table>`;
+}
+function renderAuctionGrid() {
+  const el = document.getElementById('auction-grid');
+  if (el) el.innerHTML = auctionTableHTML();
 }
 
 function renderHandResult(bidMade, declarerTeam, effectiveBid, swing) {
@@ -1492,8 +1496,9 @@ function onCloseScorecard() { show('scorecard-panel', false); }
 // The review opens only AFTER a hand concludes and steps through that hand's tricks; a note added
 // while viewing a trick auto-anchors to it. The replay reads CORE state.tricks (enriched in
 // resolveTrick), so it keeps working when feedback.js is later removed for production.
-let reviewTrickIndex = 0;                          // 0-based cursor into state.tricks while open
+let reviewTrickIndex = 0;                          // cursor into the review: -1 = Bidding, 0..N-1 = tricks
 let reviewNoteDraft  = { note: '', editingId: null };
+let reviewOpen = false;                            // true while the review panel is open (drives renderHand sourcing)
 
 function escHtml(s) {
   return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -1511,40 +1516,75 @@ function reviewAvailable() {
   return state.phase === PHASE.HAND_SCORING && Array.isArray(state.tricks) && state.tricks.length > 0;
 }
 
-// Open / close the post-hand review (a bottom sheet that keeps the centre cards visible above it).
+// The cards a seat still holds AFTER playing into review-step k (0-based trick index).
+// k < 0 is the Bidding step → the full original deal (nothing played yet).
+function reviewHandAt(seat, k) {
+  const dealt = state.dealtHands[seat] || [];
+  if (k < 0) return dealt.slice();
+  const played = [];
+  for (let i = 0; i <= k && i < state.tricks.length; i++) {
+    for (const p of state.tricks[i].plays) if (p.seat === seat) played.push(p.card);
+  }
+  return dealt.filter(c => !played.some(pc => sameCard(pc, c)));
+}
+
+// Bidding step shows the auction table in the centre (hiding the trick slots); trick steps
+// show the played cards. Toggle which one occupies #center-col.
+function showReviewAuction(on) {
+  const area = document.getElementById('center-area');
+  const auc  = document.getElementById('review-auction');
+  if (area) area.hidden = on;
+  if (auc)  { auc.hidden = !on; if (on) auc.innerHTML = auctionTableHTML(); }
+}
+function contractLine() {
+  if (state.declarer === null) return '';
+  const tr = state.isNoTrump ? 'NT' : (state.trumpSuit ? SUIT_SYMBOL[state.trumpSuit] : '');
+  return `${seatName(state.declarer)} bid ${state.highBid} ${tr}${state.isSingleHand ? ' · Single Hand' : ''}`;
+}
+
+// Open / close the post-hand review. The compact box docks to the right of the trick zone so
+// the South fan stays visible; hands shrink trick-by-trick as you step.
 function onShowReview() {
   show('hand-result-panel', false);                // never stack the centred Hand Over card over the cards
   if (!reviewAvailable()) { setStatus('Finish a hand first — then step through its tricks.'); return; }
-  reviewTrickIndex = 0;
-  if (state.reviewMode !== 'original') { state.reviewMode = 'original'; for (let i = 0; i < 4; i++) renderHand(i); }
-  renderReviewTrick(0);
+  reviewOpen = true;
+  state.reviewMode = 'original';
+  renderReviewTrick(0);                            // start at Trick 1; step ‹ to reach Bidding
   show('review-panel', true);
 }
 function onCloseReview() {
+  reviewOpen = false;
   reviewTrickIndex = -1;
   show('review-panel', false);
   clearReviewWinner();
+  showReviewAuction(false);                        // restore #center-area, hide the auction table
+  for (let s = 0; s < 4; s++) renderHand(s);       // back to the full-8 face-up reveal
   updateTrickArea();                               // restore the empty centre (currentTrick is [] at hand end)
 }
 
-// Paint one trick's cards into the centre slots and highlight the winning card + label.
-function renderReviewTrick(i) {
-  const tricks = state.tricks || [];
-  if (!tricks.length) return;
-  reviewTrickIndex = Math.max(0, Math.min(i, tricks.length - 1));
-  const trick = tricks[reviewTrickIndex];
-  reviewNoteDraft = { note: '', editingId: null };   // no draft bleed across tricks (the old trap)
+// Render one review step: k = -1 → Bidding (auction + full hands); k ≥ 0 → that trick's cards.
+function renderReviewTrick(k) {
+  const n = state.tricks.length;
+  reviewTrickIndex = Math.max(-1, Math.min(k, n - 1));
+  reviewNoteDraft = { note: '', editingId: null };   // no draft bleed across steps (the old trap)
   clearReviewWinner();
+  for (let s = 0; s < 4; s++) renderHand(s);          // shrink the fans to this step (full deal at Bidding)
   for (let seat = 0; seat < 4; seat++) {
     const slot = document.getElementById(`trick-slot-${seat}`);
     if (slot) slot.innerHTML = '';
   }
-  for (const p of trick.plays) {                     // length 3 in a Single Hand → sitting-out slot stays empty
-    const slot = document.getElementById(`trick-slot-${p.seat}`);
-    if (slot) slot.appendChild(createCardEl(p.card, true));
+  if (reviewTrickIndex < 0) {
+    showReviewAuction(true);                          // Bidding view: auction table in the centre
+  } else {
+    showReviewAuction(false);
+    const trick = state.tricks[reviewTrickIndex];
+    for (const p of trick.plays) {                    // length 3 in a Single Hand → sitting-out slot stays empty
+      const slot = document.getElementById(`trick-slot-${p.seat}`);
+      if (slot) slot.appendChild(createCardEl(p.card, true));
+    }
+    document.getElementById(`trick-slot-${trick.winner}`)?.classList.add('trick-winner');
+    document.getElementById(`label-${trick.winner}`)?.classList.add('trick-winner');
   }
-  document.getElementById(`trick-slot-${trick.winner}`)?.classList.add('trick-winner');
-  document.getElementById(`label-${trick.winner}`)?.classList.add('trick-winner');
   updateReviewIndicator();
   renderReviewNote();
 }
@@ -1554,42 +1594,50 @@ function clearReviewWinner() {
     document.getElementById(`label-${seat}`)?.classList.remove('trick-winner');
   }
 }
-function onReviewPrev() { if (reviewTrickIndex > 0) renderReviewTrick(reviewTrickIndex - 1); }
+function onReviewPrev() { if (reviewTrickIndex > -1) renderReviewTrick(reviewTrickIndex - 1); }
 function onReviewNext() { if (reviewTrickIndex < state.tricks.length - 1) renderReviewTrick(reviewTrickIndex + 1); }
 function updateReviewIndicator() {
   const n = state.tricks.length;
-  const t = state.tricks[reviewTrickIndex];
-  setText('review-count', `Trick ${reviewTrickIndex + 1} / ${n}`);
   const prev = document.getElementById('review-prev');
   const next = document.getElementById('review-next');
-  if (prev) prev.disabled = reviewTrickIndex <= 0;
+  if (reviewTrickIndex < 0) {                         // Bidding step
+    setText('review-count', 'Bidding');
+    setText('review-meta', contractLine());
+    if (prev) prev.disabled = true;
+    if (next) next.disabled = n === 0;
+    return;
+  }
+  const t = state.tricks[reviewTrickIndex];
+  setText('review-count', `Trick ${reviewTrickIndex + 1} / ${n}`);
+  if (prev) prev.disabled = false;                   // ‹ always available — steps back toward Bidding
   if (next) next.disabled = reviewTrickIndex >= n - 1;
   setText('review-meta', t ? `${seatName(t.winner)} wins (+${t.points})` : '');
 }
 
-// Note-per-trick: the note anchors to the trick currently in view.
+// Note-per-step: the note anchors to whatever is in view — the Bidding step or a trick.
 function renderReviewNote() {
   const body = document.getElementById('review-note-body');
   if (!body) return;
-  const anchor = reviewTrickIndex + 1;
+  const atBid = reviewTrickIndex < 0;
+  const label = atBid ? 'Bidding' : `Trick ${reviewTrickIndex + 1}`;
   const all = feedbackLog.getFlags();
   const list = all.length ? all.map(f => `
       <div class="note-row">
-        <span class="note-row-t">T${f.anchorTrick}</span>
+        <span class="note-row-t">${f.anchorTrick === 0 ? 'Bid' : 'T' + f.anchorTrick}</span>
         <span class="note-row-text">${escHtml(f.note)}</span>
         <button class="note-mini" onclick="onEditReviewNote('${f.id}')">Edit</button>
         <button class="note-mini note-del" onclick="onDeleteReviewNote('${f.id}')">✕</button>
       </div>`).join('') : '<div class="note-empty">No notes yet this hand.</div>';
   body.innerHTML = `
     <div class="note-line">
-      <span class="note-lbl">Note · Trick ${anchor}</span>
+      <span class="note-lbl">Note · ${label}</span>
       <span class="note-sub">Hand ${feedbackLog.getHandNumber() ?? '–'} · ${all.length} note${all.length === 1 ? '' : 's'}</span>
     </div>
-    <textarea id="review-note" class="note-ta" placeholder="What happened in this trick?">${escHtml(reviewNoteDraft.note)}</textarea>
+    <textarea id="review-note" class="note-ta" placeholder="${atBid ? 'What about the bidding?' : 'What happened in this trick?'}">${escHtml(reviewNoteDraft.note)}</textarea>
     <div class="bid-actions">
       <button class="btn btn-primary" onclick="onSaveReviewNote()">${reviewNoteDraft.editingId ? 'Update' : 'Save note'}</button>
       <button class="btn btn-secondary" onclick="onClearReviewNote()">Clear</button>
-      <button class="btn btn-secondary" onclick="onExportFeedback()">⬇ Export (hand ${feedbackLog.getHandNumber() ?? '–'})</button>
+      <button class="btn btn-secondary" onclick="onExportFeedback()">⬇ Export</button>
     </div>
     <div class="note-list">${list}</div>`;
 }
@@ -1601,7 +1649,7 @@ function onSaveReviewNote() {
   syncReviewNote();
   const text = reviewNoteDraft.note.trim();
   if (!text) { document.getElementById('review-note')?.classList.add('note-need'); return; }
-  const anchor = reviewTrickIndex + 1;
+  const anchor = reviewTrickIndex < 0 ? 0 : reviewTrickIndex + 1;   // 0 = Bidding
   if (reviewNoteDraft.editingId) {
     feedbackLog.updateFlag(reviewNoteDraft.editingId, { anchorTrick: anchor, relatedTricks: [], note: text });
   } else {
@@ -1615,9 +1663,8 @@ function onClearReviewNote() { reviewNoteDraft = { note: '', editingId: null }; 
 function onEditReviewNote(id) {
   const f = feedbackLog.getFlags().find(x => x.id === id);
   if (!f) return;
-  if (typeof f.anchorTrick === 'number' && state.tricks[f.anchorTrick - 1]) {
-    renderReviewTrick(f.anchorTrick - 1);          // snap the viewer to the note's trick…
-  }
+  if (f.anchorTrick === 0) renderReviewTrick(-1);                              // snap to the Bidding step…
+  else if (typeof f.anchorTrick === 'number' && state.tricks[f.anchorTrick - 1]) renderReviewTrick(f.anchorTrick - 1);  // …or the note's trick
   reviewNoteDraft = { note: f.note, editingId: id };   // …then set the draft (renderReviewTrick reset it)
   renderReviewNote();
 }

@@ -385,15 +385,20 @@ html, body {
 }
 #reveal-box .btn { padding: 6px 14px; font-size: 0.82rem; }
 
-/* ── Play-by-play review sheet (post-hand; the centre cards stay visible above it) ── */
-#review-panel { align-items: flex-end; }
+/* ── Play-by-play review (post-hand) ──────────────────────────────────────────── */
+/* The compact box docks to the RIGHT of the centre trick zone (absolute within the overlay),
+   vertically centred — clear of the South fan (bottom) and the East fan (right column). */
 #review-sheet {
-  width: 92%; max-width: 460px; margin-bottom: 6px;
-  background: #1e293b; border-radius: 12px; padding: 8px 12px;
+  position: absolute; left: 63%; top: 47%; transform: translateY(-50%);
+  width: 196px; max-height: 58%; overflow-y: auto;
+  background: #1e293b; border-radius: 10px; padding: 7px 9px;
   box-shadow: 0 12px 40px rgba(0,0,0,0.6);
-  max-height: 30%; overflow-y: auto;    /* bottom sheet — stays below the played cards */
-  color: #e2e8f0; font-size: 0.78rem;
+  color: #e2e8f0; font-size: 0.72rem;
 }
+/* The auction table shown in the centre at the Bidding step */
+#review-auction { display: flex; align-items: center; justify-content: center; }
+#review-auction .auction-table { font-size: 0.82rem; }
+#review-auction .auction-table th, #review-auction .auction-table td { padding: 3px 12px; }
 .review-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .review-count { font-weight: 800; color: #fde047; min-width: 84px; text-align: center; }
 .review-meta { color: #94a3b8; font-size: 0.74rem; flex: 1; }
@@ -492,11 +497,13 @@ html, body {
   #reveal-box { margin-bottom: 40vw; gap: 2vw; padding: 1.6vw 2vw; border-radius: 2vw; }
   #reveal-box .btn { padding: 1.8vw 3.6vw; font-size: 3vw; }
 
-  /* review bottom-sheet — wider + larger tap targets on phones (centre cards stay visible above) */
-  #review-sheet { width: 94vw; max-width: none; font-size: 3vw; max-height: 66vh; padding: 2.4vw 3vw; margin-bottom: 2vw; }
+  /* review box docks at the TOP in portrait (keeps the bottom South fan + centre cards visible) */
+  #review-panel { align-items: flex-start; }
+  #review-sheet { position: static; left: auto; top: auto; transform: none; width: 94vw; max-width: none; font-size: 3vw; max-height: 42vh; padding: 2.4vw 3vw; margin-top: 2vw; }
   .review-count { font-size: 3.4vw; min-width: 30vw; }
   .review-meta { font-size: 2.7vw; }
   .review-head .step-btn { width: 9vw; height: 8vw; font-size: 4vw; }
+  #review-auction .auction-table { font-size: 3.4vw; }
   .note-lbl { font-size: 3.2vw; }
   .note-sub { font-size: 2.7vw; }
   .note-ta { min-height: 16vw; font-size: 3vw; }
