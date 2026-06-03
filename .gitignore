@@ -21,3 +21,6 @@ _test.js
 
 # Working screenshots — kept on disk, not in the repo
 UI Screenshots/
+
+# Screenshot workflow (Puppeteer captures)
+temporary screenshots/

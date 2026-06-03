@@ -26,7 +26,7 @@ git commit -m "message"
 git push origin main
 ```
 
-**Session hooks (`.claude/settings.json`, committed):** a **`SessionStart`** hook runs `git pull --ff-only` so each session begins on the latest; a **`SessionEnd`** hook runs `git add -A` + a timestamped "Auto-commit on session end" commit + `git push origin main` so work is never lost even without an explicit commit. Both are wrapped in `|| true` (never block a session). `git add -A` respects `.gitignore`: **`.claude/launch.json`** (machine-local preview config), **`card-game-29/UI Screenshots/`** (working images), and **`*.tmp.*`** (atomic-write editor temp files) are gitignored and intentionally **not** committed — don't rely on the auto-commit to capture those.
+**Session hooks (`.claude/settings.json`, committed):** a **`SessionStart`** hook runs `git pull --ff-only origin main` (verbose, no `-q`) so each session begins on the latest AND the result is visible — "Already up to date." / fast-forward summary on success, or "[SessionStart] git pull FAILED — session continued anyway" if it errors. A **`SessionEnd`** hook runs `git add -A` + a timestamped "Auto-commit on session end" commit + `git push origin main` so work is never lost even without an explicit commit. Neither hook blocks the session (SessionEnd is wrapped in `|| true`; SessionStart's failure branch echoes a marker and exits 0). `git add -A` respects `.gitignore`: **`.claude/launch.json`** (machine-local preview config), **`card-game-29/UI Screenshots/`** (working images), and **`*.tmp.*`** (atomic-write editor temp files) are gitignored and intentionally **not** committed — don't rely on the auto-commit to capture those.
 
 When you reach a meaningful, self-contained milestone *during* a session (a finished feature, a fix), prefer making a real commit with a clean, descriptive message scoped to that one change, rather than leaving it for the catch-all session-end commit. The auto-commit is a safety net, not a substitute for good commit messages. After pushing, a commit is viewable at `https://github.com/vardan-kabra/browser-games/commit/<sha>`.
 
@@ -122,3 +122,35 @@ When a game finishes:
 Rules: never reveal the secret during play; in training mode show exactly ONE collapsible hint per turn
 (closed by default); if asked "what should I guess?", apply rule R10 on the current pruned set; be warm
 and specific; never over-praise early-round eliminations.
+
+### Screenshot Workflow
+
+- Puppeteer is installed as a dev dependency. Chrome cache is at `C:\Users\Vardan Kabra\.cache\puppeteer`.
+- **Always screenshot from localhost:** `node screenshot.mjs http://localhost:8000`
+- Screenshots are saved automatically to `./temporary screenshots/screenshot-N.png` (auto-incremented, never overwritten).
+- Optional label suffix: `node screenshot.mjs http://localhost:8000 label` → saves as `screenshot-N-label.png`
+- `screenshot.mjs` lives in the project root. Use it as-is.
+- After screenshotting, read the PNG from `temporary screenshots/` with the Read tool — Claude can see and analyze the image directly.
+
+#### When to screenshot
+
+- **Before and after** any visual/UI change — take a "before" shot, make the change, take an "after" shot, then compare.
+- After fixing CSS or layout bugs — verify the fix visually.
+- When the user asks "does this look right" or "check the UI" — take a screenshot and describe what you see.
+- When comparing against a reference image the user has provided.
+
+#### How to compare
+
+- Be specific with measurements: "heading is 32px but reference shows ~24px", "card gap is 16px but should be 24px".
+- Check these properties: spacing/padding, font size/weight/line-height, colors (exact hex), alignment, border-radius, shadows, image sizing.
+- Call out differences clearly: what IS vs what SHOULD BE.
+- If the user has provided a reference/mockup image, compare against it point by point.
+
+#### Useful labels for this project
+
+Use descriptive labels to keep screenshots organized:
+
+- `node screenshot.mjs http://localhost:8000 home` — root landing page (`index.html`)
+- `node screenshot.mjs http://localhost:8000/tic-tac-toe.html tic-tac-toe` — Tic Tac Toe board
+- `node screenshot.mjs http://localhost:8000/bulls-and-cows/ bulls-and-cows` — Bulls & Cows main view
+- `node screenshot.mjs http://localhost:8000/card-game-29/ card-game-29` — 29 Card Game (note: heavy DOM may time out; prefer the `preview_*` tool flow described above for this game)

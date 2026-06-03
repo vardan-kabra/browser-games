@@ -6,7 +6,7 @@
           {
             "type": "command",
             "shell": "bash",
-            "command": "git pull --ff-only -q origin main || true",
+            "command": "git pull --ff-only origin main 2>&1 || echo \"[SessionStart] git pull FAILED — session continued anyway\"",
             "statusMessage": "Pulling latest from GitHub...",
             "timeout": 60
           }

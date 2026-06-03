@@ -1,0 +1,14 @@
+SessionEnd hook test marker — created 2026-06-03
+
+PURPOSE
+  Empirically verify when the SessionEnd hook (`.claude/settings.json`) fires
+  on the Claude Code Desktop app. The hook should auto-commit + push.
+
+HOW TO READ THE RESULT
+  If this file appears in a commit titled "Auto-commit on session end: ..."
+  on https://github.com/vardan-kabra/browser-games/commits/main, then the
+  SessionEnd hook fired successfully on the exit path that was tested.
+  If no such commit appears, the hook didn't fire on that exit path.
+
+CLEANUP
+  Delete this file (and commit the deletion) after the test is complete.
