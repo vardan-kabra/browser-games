@@ -4,7 +4,7 @@
 // as confirmation that fresh assets actually loaded after deploy.
 // To retire: delete this const, the #version-badge element in index.html, the
 // .version-badge CSS rule, and the DOMContentLoaded render line below.
-const VERSION = "V5";
+const VERSION = "V6";
 
 let secret = '';
 let turnCount = 0;

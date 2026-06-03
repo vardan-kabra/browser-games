@@ -40,7 +40,16 @@ html, body {
   height: 30px; flex-shrink: 0; padding: 0 12px;
   background: #0b0b0d; color: #e5e7eb;
 }
-#app-title { font-weight: 800; font-size: 0.95rem; letter-spacing: 0.04em; flex-shrink: 0; }
+#app-title { font-weight: 800; font-size: 0.95rem; letter-spacing: 0.04em; flex-shrink: 0; margin-left: 10px; }
+.home-link {
+  font-size: 0.72rem; color: #cbd5e1; text-decoration: none;
+  padding: 3px 10px; border-radius: 999px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  flex-shrink: 0; line-height: 1;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.home-link:hover { background: rgba(255,255,255,0.16); color: #fff; border-color: rgba(255,255,255,0.25); }
 #status-msg {
   flex: 1; text-align: center; font-size: 0.74rem; color: rgba(255,255,255,0.85);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 10px;

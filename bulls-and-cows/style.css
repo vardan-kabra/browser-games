@@ -61,6 +61,26 @@ header p {
   color: var(--muted);
 }
 
+.home-link {
+  position: fixed;
+  top: 14px;
+  left: 16px;
+  font-size: 0.85rem;
+  color: var(--text);
+  text-decoration: none;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid var(--border);
+  z-index: 1000;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.home-link:hover {
+  background: rgba(15, 23, 42, 0.95);
+  border-color: var(--violet);
+  color: var(--bright);
+}
+
 /* Temporary dev-mode version badge — see the VERSION constant in game.js. */
 .version-badge {
   display: inline-block;
