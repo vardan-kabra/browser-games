@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>29 — Card Game</title>
-  <link rel="stylesheet" href="style.css?v=10" />
+  <link rel="stylesheet" href="style.css?v=11" />
 </head>
 <body>
 
@@ -19,7 +19,7 @@
     <span id="status-msg"></span>
     <div id="toolbar-icons">
       <button class="tb-btn" id="cardstyle-btn" title="Card style: graphic — tap to switch" onclick="onToggleCardStyle()">🂠</button>
-      <button class="tb-btn" id="flag-btn" title="Flag a trick for AI feedback" onclick="onShowFlags()">🚩<span id="flag-count" hidden>0</span></button>
+      <button class="tb-btn" id="review-btn" title="Review this hand's tricks" onclick="onShowReview()" disabled>🔁<span id="flag-count" hidden>0</span></button>
       <button class="tb-btn" title="Scorecard" onclick="onShowScorecard()">🗒</button>
       <button class="tb-btn" title="How to play" onclick="onShowRules()">?</button>
       <button class="tb-btn" title="New match" onclick="onNewMatch()">⟳</button>
@@ -156,10 +156,18 @@
     </div>
   </div>
 
-  <!-- ── AI-feedback flag panel (bottom sheet; body built by renderFlagPanel) ── -->
-  <div id="flag-panel" class="overlay-panel" hidden>
-    <div id="flag-sheet">
-      <div id="flag-body"></div>
+  <!-- ── Play-by-play review (post-hand). Transparent overlay; the compact bottom sheet keeps
+       the replayed centre cards visible above it. Body built by renderReviewNote(). ── -->
+  <div id="review-panel" class="overlay-panel" hidden>
+    <div id="review-sheet">
+      <div class="review-head">
+        <button id="review-prev" class="step-btn" onclick="onReviewPrev()">‹</button>
+        <span id="review-count" class="review-count">Trick 1 / 8</span>
+        <button id="review-next" class="step-btn" onclick="onReviewNext()">›</button>
+        <span id="review-meta" class="review-meta"></span>
+        <button class="flag-x" title="Close review" onclick="onCloseReview()">✕</button>
+      </div>
+      <div id="review-note-body"></div>
     </div>
   </div>
 
@@ -184,7 +192,7 @@
         <button class="btn btn-secondary" onclick="onShowScorecard()">Scorecard</button>
       </div>
       <div class="bid-actions" style="margin-top:6px">
-        <button class="btn btn-secondary" onclick="onShowFlags()">Flag a trick</button>
+        <button class="btn btn-secondary" onclick="onShowReview()">Review hand</button>
         <button class="btn btn-secondary" onclick="onExportFeedback()">Export feedback</button>
       </div>
     </div>
@@ -231,6 +239,6 @@
 <script src="cards.js?v=10"></script>
 <script src="ai.js?v=10"></script>
 <script src="feedback.js?v=10"></script>
-<script src="game.js?v=10"></script>
+<script src="game.js?v=11"></script>
 </body>
 </html>

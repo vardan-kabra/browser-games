@@ -263,6 +263,7 @@ function startHand() {
   state.trickPoints    = [0, 0];
   state.lastTrickWinner = null;
   state.trickCount     = 0;
+  setReviewBtnEnabled(false);   // the review unlocks only once this hand concludes
 
   setPhase(PHASE.BIDDING);
   renderAll();
@@ -791,7 +792,13 @@ function resolveTrick() {
   state.trickPoints[teamOf(winner)] += pts;
   state.tricksWonBy[teamOf(winner)]++;          // trick count per team (Marriage gating §6)
   state.lastTrickWinner = winner;
-  state.tricks.push({ winner, cards: state.currentTrick.map(t => t.card) });
+  state.tricks.push({
+    winner,
+    leader: state.currentTrick[0].playerIndex,
+    plays:  state.currentTrick.map(t => ({ seat: t.playerIndex, card: t.card })),
+    points: pts,
+    cards:  state.currentTrick.map(t => t.card),   // retained — harmless (zero readers), keeps the diff non-destructive
+  });
   state.trickCount++;
   // Move-log capture (AI-feedback): finalize this trick (+1 on the normal-hand last trick).
   feedbackLog.logTrickResolved({
@@ -1071,6 +1078,7 @@ function concludeHand(resultBanner, showPanel) {
     setTimeout(() => {
       state.reviewMode = 'original';
       renderReview();
+      setReviewBtnEnabled(true);
       hideRevealBanner();
       showPanel();
     }, 2600);
@@ -1078,7 +1086,7 @@ function concludeHand(resultBanner, showPanel) {
     state.reviewMode = 'original';
     renderReview();
     showRevealBanner(resultBanner);
-    setTimeout(() => { hideRevealBanner(); showPanel(); }, 2500);
+    setTimeout(() => { hideRevealBanner(); setReviewBtnEnabled(true); showPanel(); }, 2500);
   }
 }
 
@@ -1479,106 +1487,145 @@ function onShowScorecard() {
 }
 function onCloseScorecard() { show('scorecard-panel', false); }
 
-// ── AI-feedback flagging (UI layer; data lives in feedback.js) ──────────────────
-let flagDraft = { anchor: 1, related: [], note: '', editingId: null };
+// ── Play-by-play review + note-per-trick feedback (UI layer; data lives in feedback.js) ──
+// Mid-play flagging was removed (it laid a card-blocking overlay over live play and felt stuck).
+// The review opens only AFTER a hand concludes and steps through that hand's tricks; a note added
+// while viewing a trick auto-anchors to it. The replay reads CORE state.tricks (enriched in
+// resolveTrick), so it keeps working when feedback.js is later removed for production.
+let reviewTrickIndex = 0;                          // 0-based cursor into state.tricks while open
+let reviewNoteDraft  = { note: '', editingId: null };
 
 function escHtml(s) {
   return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 }
-// The trick to anchor a flag to: the in-progress trick during play, else the last
-// completed one (min 1). Also the upper bound for the anchor/related selectors.
-function currentTrickNo() {
-  const done = state.tricks ? state.tricks.length : 0;
-  const inProgress = state.currentTrick && state.currentTrick.length ? 1 : 0;
-  return Math.max(1, done + inProgress);
-}
-function updateFlagBadge() {
+function updateFlagBadge() {                       // #flag-count now counts this hand's notes
   const n = feedbackLog.flagCount();
   const el = document.getElementById('flag-count');
   if (el) { el.textContent = n; el.hidden = n === 0; }
 }
-function onShowFlags() {
-  if (!feedbackLog.hasHand()) { setStatus('Nothing to flag yet — deal a hand first.'); return; }
-  flagDraft = { anchor: currentTrickNo(), related: [], note: '', editingId: null };
-  renderFlagPanel();
-  show('flag-panel', true);
+function setReviewBtnEnabled(on) {
+  const b = document.getElementById('review-btn');
+  if (b) b.disabled = !on;
 }
-function onCloseFlags() { show('flag-panel', false); }
-function syncFlagDraft() {
-  const ta = document.getElementById('flag-note');
-  if (ta) flagDraft.note = ta.value;
+function reviewAvailable() {
+  return state.phase === PHASE.HAND_SCORING && Array.isArray(state.tricks) && state.tricks.length > 0;
 }
-function onFlagAnchorStep(d) {
-  syncFlagDraft();
-  flagDraft.anchor = Math.max(1, Math.min(currentTrickNo(), flagDraft.anchor + d));
-  renderFlagPanel();
+
+// Open / close the post-hand review (a bottom sheet that keeps the centre cards visible above it).
+function onShowReview() {
+  show('hand-result-panel', false);                // never stack the centred Hand Over card over the cards
+  if (!reviewAvailable()) { setStatus('Finish a hand first — then step through its tricks.'); return; }
+  reviewTrickIndex = 0;
+  if (state.reviewMode !== 'original') { state.reviewMode = 'original'; for (let i = 0; i < 4; i++) renderHand(i); }
+  renderReviewTrick(0);
+  show('review-panel', true);
 }
-function onToggleRelated(n) {
-  syncFlagDraft();
-  const i = flagDraft.related.indexOf(n);
-  if (i >= 0) flagDraft.related.splice(i, 1); else flagDraft.related.push(n);
-  flagDraft.related.sort((a, b) => a - b);
-  renderFlagPanel();
+function onCloseReview() {
+  reviewTrickIndex = -1;
+  show('review-panel', false);
+  clearReviewWinner();
+  updateTrickArea();                               // restore the empty centre (currentTrick is [] at hand end)
 }
-function onSaveFlag() {
-  syncFlagDraft();
-  if (!flagDraft.note.trim()) { const ta = document.getElementById('flag-note'); if (ta) ta.classList.add('flag-need'); return; }
-  if (flagDraft.editingId) {
-    feedbackLog.updateFlag(flagDraft.editingId, { anchorTrick: flagDraft.anchor, relatedTricks: flagDraft.related, note: flagDraft.note.trim() });
-  } else {
-    feedbackLog.addFlag({ anchorTrick: flagDraft.anchor, relatedTricks: flagDraft.related, note: flagDraft.note.trim() });
+
+// Paint one trick's cards into the centre slots and highlight the winning card + label.
+function renderReviewTrick(i) {
+  const tricks = state.tricks || [];
+  if (!tricks.length) return;
+  reviewTrickIndex = Math.max(0, Math.min(i, tricks.length - 1));
+  const trick = tricks[reviewTrickIndex];
+  reviewNoteDraft = { note: '', editingId: null };   // no draft bleed across tricks (the old trap)
+  clearReviewWinner();
+  for (let seat = 0; seat < 4; seat++) {
+    const slot = document.getElementById(`trick-slot-${seat}`);
+    if (slot) slot.innerHTML = '';
   }
-  flagDraft = { anchor: currentTrickNo(), related: [], note: '', editingId: null };
-  updateFlagBadge();
-  renderFlagPanel();
+  for (const p of trick.plays) {                     // length 3 in a Single Hand → sitting-out slot stays empty
+    const slot = document.getElementById(`trick-slot-${p.seat}`);
+    if (slot) slot.appendChild(createCardEl(p.card, true));
+  }
+  document.getElementById(`trick-slot-${trick.winner}`)?.classList.add('trick-winner');
+  document.getElementById(`label-${trick.winner}`)?.classList.add('trick-winner');
+  updateReviewIndicator();
+  renderReviewNote();
 }
-function onEditFlag(id) {
+function clearReviewWinner() {
+  for (let seat = 0; seat < 4; seat++) {
+    document.getElementById(`trick-slot-${seat}`)?.classList.remove('trick-winner');
+    document.getElementById(`label-${seat}`)?.classList.remove('trick-winner');
+  }
+}
+function onReviewPrev() { if (reviewTrickIndex > 0) renderReviewTrick(reviewTrickIndex - 1); }
+function onReviewNext() { if (reviewTrickIndex < state.tricks.length - 1) renderReviewTrick(reviewTrickIndex + 1); }
+function updateReviewIndicator() {
+  const n = state.tricks.length;
+  const t = state.tricks[reviewTrickIndex];
+  setText('review-count', `Trick ${reviewTrickIndex + 1} / ${n}`);
+  const prev = document.getElementById('review-prev');
+  const next = document.getElementById('review-next');
+  if (prev) prev.disabled = reviewTrickIndex <= 0;
+  if (next) next.disabled = reviewTrickIndex >= n - 1;
+  setText('review-meta', t ? `${seatName(t.winner)} wins (+${t.points})` : '');
+}
+
+// Note-per-trick: the note anchors to the trick currently in view.
+function renderReviewNote() {
+  const body = document.getElementById('review-note-body');
+  if (!body) return;
+  const anchor = reviewTrickIndex + 1;
+  const all = feedbackLog.getFlags();
+  const list = all.length ? all.map(f => `
+      <div class="note-row">
+        <span class="note-row-t">T${f.anchorTrick}</span>
+        <span class="note-row-text">${escHtml(f.note)}</span>
+        <button class="note-mini" onclick="onEditReviewNote('${f.id}')">Edit</button>
+        <button class="note-mini note-del" onclick="onDeleteReviewNote('${f.id}')">✕</button>
+      </div>`).join('') : '<div class="note-empty">No notes yet this hand.</div>';
+  body.innerHTML = `
+    <div class="note-line">
+      <span class="note-lbl">Note · Trick ${anchor}</span>
+      <span class="note-sub">Hand ${feedbackLog.getHandNumber() ?? '–'} · ${all.length} note${all.length === 1 ? '' : 's'}</span>
+    </div>
+    <textarea id="review-note" class="note-ta" placeholder="What happened in this trick?">${escHtml(reviewNoteDraft.note)}</textarea>
+    <div class="bid-actions">
+      <button class="btn btn-primary" onclick="onSaveReviewNote()">${reviewNoteDraft.editingId ? 'Update' : 'Save note'}</button>
+      <button class="btn btn-secondary" onclick="onClearReviewNote()">Clear</button>
+      <button class="btn btn-secondary" onclick="onExportFeedback()">⬇ Export (hand ${feedbackLog.getHandNumber() ?? '–'})</button>
+    </div>
+    <div class="note-list">${list}</div>`;
+}
+function syncReviewNote() {
+  const ta = document.getElementById('review-note');
+  if (ta) reviewNoteDraft.note = ta.value;
+}
+function onSaveReviewNote() {
+  syncReviewNote();
+  const text = reviewNoteDraft.note.trim();
+  if (!text) { document.getElementById('review-note')?.classList.add('note-need'); return; }
+  const anchor = reviewTrickIndex + 1;
+  if (reviewNoteDraft.editingId) {
+    feedbackLog.updateFlag(reviewNoteDraft.editingId, { anchorTrick: anchor, relatedTricks: [], note: text });
+  } else {
+    feedbackLog.addFlag({ anchorTrick: anchor, relatedTricks: [], note: text });
+  }
+  reviewNoteDraft = { note: '', editingId: null };
+  updateFlagBadge();
+  renderReviewNote();
+}
+function onClearReviewNote() { reviewNoteDraft = { note: '', editingId: null }; renderReviewNote(); }
+function onEditReviewNote(id) {
   const f = feedbackLog.getFlags().find(x => x.id === id);
   if (!f) return;
-  flagDraft = { anchor: f.anchorTrick, related: (f.relatedTricks || []).slice(), note: f.note, editingId: id };
-  renderFlagPanel();
-}
-function onDeleteFlag(id) { feedbackLog.deleteFlag(id); updateFlagBadge(); renderFlagPanel(); }
-
-function renderFlagPanel() {
-  const body = document.getElementById('flag-body');
-  if (!body) return;
-  const cur = currentTrickNo();
-  if (flagDraft.anchor > cur) flagDraft.anchor = cur;
-  let chips = '';
-  for (let n = 1; n <= cur; n++) {
-    chips += `<button class="flag-chip${flagDraft.related.includes(n) ? ' on' : ''}" onclick="onToggleRelated(${n})">${n}</button>`;
+  if (typeof f.anchorTrick === 'number' && state.tricks[f.anchorTrick - 1]) {
+    renderReviewTrick(f.anchorTrick - 1);          // snap the viewer to the note's trick…
   }
-  const flags = feedbackLog.getFlags();
-  const list = flags.length ? flags.map(f => {
-    const rel = f.relatedTricks && f.relatedTricks.length ? ` · rel ${f.relatedTricks.join(',')}` : '';
-    return `<div class="flag-row">
-        <span class="flag-row-t">T${f.anchorTrick}${rel}</span>
-        <span class="flag-row-note">${escHtml(f.note)}</span>
-        <button class="flag-mini" onclick="onEditFlag('${f.id}')">Edit</button>
-        <button class="flag-mini flag-del" onclick="onDeleteFlag('${f.id}')">✕</button>
-      </div>`;
-  }).join('') : '<div class="flag-empty">No flags yet this hand.</div>';
-
-  body.innerHTML = `
-    <div class="flag-head">
-      <b>${flagDraft.editingId ? 'Edit flag' : 'Flag a trick'}</b>
-      <span class="flag-sub">Hand ${feedbackLog.getHandNumber() ?? '–'} · ${flags.length} flag${flags.length === 1 ? '' : 's'}</span>
-      <button class="flag-x" title="Close" onclick="onCloseFlags()">✕</button>
-    </div>
-    <div class="flag-line"><span class="flag-lbl">Trick</span>
-      <button class="step-btn" onclick="onFlagAnchorStep(-1)">−</button>
-      <span class="flag-anchor">${flagDraft.anchor}</span>
-      <button class="step-btn" onclick="onFlagAnchorStep(1)">+</button>
-    </div>
-    <div class="flag-line"><span class="flag-lbl">Related</span><span class="flag-chips">${chips || '<span class="flag-sub">—</span>'}</span></div>
-    <textarea id="flag-note" class="flag-note" placeholder="What went wrong here?">${escHtml(flagDraft.note)}</textarea>
-    <div class="bid-actions">
-      <button class="btn btn-primary" onclick="onSaveFlag()">${flagDraft.editingId ? 'Update' : 'Save'}</button>
-      <button class="btn btn-secondary" onclick="onCloseFlags()">Cancel</button>
-    </div>
-    <div class="flag-list">${list}</div>
-    <div class="bid-actions"><button class="btn btn-secondary" onclick="onExportFeedback()">⬇ Export feedback (hand ${feedbackLog.getHandNumber() ?? '–'})</button></div>`;
+  reviewNoteDraft = { note: f.note, editingId: id };   // …then set the draft (renderReviewTrick reset it)
+  renderReviewNote();
+}
+function onDeleteReviewNote(id) {
+  feedbackLog.deleteFlag(id);
+  if (reviewNoteDraft.editingId === id) reviewNoteDraft = { note: '', editingId: null };
+  updateFlagBadge();
+  renderReviewNote();
 }
 
 // Export one self-contained JSON file for this hand (Blob download).
