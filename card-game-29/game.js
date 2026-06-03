@@ -265,6 +265,7 @@ function startHand() {
   state.trickCount     = 0;
   setReviewBtnEnabled(false);   // the review + export unlock only once this hand concludes
   setExportBtnEnabled(false);
+  endHandPanel = null;
 
   setPhase(PHASE.BIDDING);
   renderAll();
@@ -1058,6 +1059,7 @@ function showToast(msg) {
 }
 
 let pendingClaimBanner = null;   // set by a claim/give-up so concludeHand shows it first
+let endHandPanel = null;         // the end-of-hand panel closure (Hand Over / Match Over) — re-shown when the review closes
 
 function renderReview() {
   for (let i = 0; i < 4; i++) renderHand(i);
@@ -1072,6 +1074,7 @@ function renderReview() {
 function concludeHand(resultBanner, showPanel) {
   const claimBanner = pendingClaimBanner;
   pendingClaimBanner = null;
+  endHandPanel = showPanel;        // remember which end panel to restore after the review closes
   if (claimBanner) {
     state.reviewMode = 'remaining';
     renderReview();
@@ -1499,7 +1502,6 @@ function onCloseScorecard() { show('scorecard-panel', false); }
 // while viewing a trick auto-anchors to it. The replay reads CORE state.tricks (enriched in
 // resolveTrick), so it keeps working when feedback.js is later removed for production.
 let reviewTrickIndex = 0;                          // cursor into the review: -1 = Bidding, 0..N-1 = tricks
-let reviewNoteDraft  = { note: '', editingId: null };
 let reviewOpen = false;                            // true while the review panel is open (drives renderHand sourcing)
 
 function escHtml(s) {
@@ -1551,7 +1553,8 @@ function contractLine() {
 // Open / close the post-hand review. The compact box docks to the right of the trick zone so
 // the South fan stays visible; hands shrink trick-by-trick as you step.
 function onShowReview() {
-  show('hand-result-panel', false);                // never stack the centred Hand Over card over the cards
+  show('hand-result-panel', false);                // never stack an end-of-hand card over the cards
+  show('match-over-panel', false);
   if (!reviewAvailable()) { setStatus('Finish a hand first — then step through its tricks.'); return; }
   reviewOpen = true;
   state.reviewMode = 'original';
@@ -1568,13 +1571,14 @@ function onCloseReview() {
   showReviewAuction(false);                        // restore #center-area, hide the auction table
   for (let s = 0; s < 4; s++) renderHand(s);       // back to the full-8 face-up reveal
   updateTrickArea();                               // restore the empty centre (currentTrick is [] at hand end)
+  // Bring back the Hand Over / Match Over panel so the player can advance (Next Hand / New Match).
+  if (endHandPanel && state.phase === PHASE.HAND_SCORING) endHandPanel();
 }
 
 // Render one review step: k = -1 → Bidding (auction + full hands); k ≥ 0 → that trick's cards.
 function renderReviewTrick(k) {
   const n = state.tricks.length;
   reviewTrickIndex = Math.max(-1, Math.min(k, n - 1));
-  reviewNoteDraft = { note: '', editingId: null };   // no draft bleed across steps (the old trap)
   clearReviewWinner();
   for (let s = 0; s < 4; s++) renderHand(s);          // shrink the fans to this step (full deal at Bidding)
   for (let seat = 0; seat < 4; seat++) {
@@ -1622,60 +1626,31 @@ function updateReviewIndicator() {
   setText('review-meta', t ? `${seatName(t.winner)} wins (+${t.points})` : '');
 }
 
-// Note-per-step: the note anchors to whatever is in view — the Bidding step or a trick.
+// Note-per-step: exactly ONE note per step (Bidding or a trick). Saving overwrites that step's
+// note; the textarea pre-fills with it on revisit. The note count lives on the #review-btn badge,
+// so there's no in-box list / edit / delete.
 function renderReviewNote() {
   const body = document.getElementById('review-note-body');
   if (!body) return;
   const atBid = reviewTrickIndex < 0;
+  const anchor = atBid ? 0 : reviewTrickIndex + 1;
   const label = atBid ? 'Bidding' : `Trick ${reviewTrickIndex + 1}`;
-  const all = feedbackLog.getFlags();
-  const list = all.length ? all.map(f => `
-      <div class="note-row">
-        <span class="note-row-t">${f.anchorTrick === 0 ? 'Bid' : 'T' + f.anchorTrick}</span>
-        <span class="note-row-text">${escHtml(f.note)}</span>
-        <button class="note-mini" onclick="onEditReviewNote('${f.id}')">Edit</button>
-        <button class="note-mini note-del" onclick="onDeleteReviewNote('${f.id}')">✕</button>
-      </div>`).join('') : '<div class="note-empty">No notes yet this hand.</div>';
+  const existing = feedbackLog.getFlags().find(f => f.anchorTrick === anchor);
   body.innerHTML = `
-    <div class="note-line">
-      <span class="note-lbl">Note · ${label}</span>
-      <span class="note-sub">Hand ${feedbackLog.getHandNumber() ?? '–'} · ${all.length} note${all.length === 1 ? '' : 's'}</span>
-    </div>
-    <textarea id="review-note" class="note-ta" placeholder="${atBid ? 'What about the bidding?' : 'What happened in this trick?'}">${escHtml(reviewNoteDraft.note)}</textarea>
+    <div class="note-line"><span class="note-lbl">Note · ${label}</span></div>
+    <textarea id="review-note" class="note-ta" placeholder="${atBid ? 'What about the bidding?' : 'What happened in this trick?'}">${escHtml(existing ? existing.note : '')}</textarea>
     <div class="bid-actions">
-      <button class="btn btn-primary" onclick="onSaveReviewNote()">${reviewNoteDraft.editingId ? 'Update' : 'Save note'}</button>
-    </div>
-    <div class="note-list">${list}</div>`;
-}
-function syncReviewNote() {
-  const ta = document.getElementById('review-note');
-  if (ta) reviewNoteDraft.note = ta.value;
+      <button class="btn btn-primary" onclick="onSaveReviewNote()">${existing ? 'Update note' : 'Save note'}</button>
+    </div>`;
 }
 function onSaveReviewNote() {
-  syncReviewNote();
-  const text = reviewNoteDraft.note.trim();
-  if (!text) { document.getElementById('review-note')?.classList.add('note-need'); return; }
+  const ta = document.getElementById('review-note');
+  const text = (ta ? ta.value : '').trim();
+  if (!text) { ta?.classList.add('note-need'); return; }
   const anchor = reviewTrickIndex < 0 ? 0 : reviewTrickIndex + 1;   // 0 = Bidding
-  if (reviewNoteDraft.editingId) {
-    feedbackLog.updateFlag(reviewNoteDraft.editingId, { anchorTrick: anchor, relatedTricks: [], note: text });
-  } else {
-    feedbackLog.addFlag({ anchorTrick: anchor, relatedTricks: [], note: text });
-  }
-  reviewNoteDraft = { note: '', editingId: null };
-  updateFlagBadge();
-  renderReviewNote();
-}
-function onEditReviewNote(id) {
-  const f = feedbackLog.getFlags().find(x => x.id === id);
-  if (!f) return;
-  if (f.anchorTrick === 0) renderReviewTrick(-1);                              // snap to the Bidding step…
-  else if (typeof f.anchorTrick === 'number' && state.tricks[f.anchorTrick - 1]) renderReviewTrick(f.anchorTrick - 1);  // …or the note's trick
-  reviewNoteDraft = { note: f.note, editingId: id };   // …then set the draft (renderReviewTrick reset it)
-  renderReviewNote();
-}
-function onDeleteReviewNote(id) {
-  feedbackLog.deleteFlag(id);
-  if (reviewNoteDraft.editingId === id) reviewNoteDraft = { note: '', editingId: null };
+  const existing = feedbackLog.getFlags().find(f => f.anchorTrick === anchor);
+  if (existing) feedbackLog.updateFlag(existing.id, { anchorTrick: anchor, relatedTricks: [], note: text });  // overwrite — one per step
+  else          feedbackLog.addFlag({ anchorTrick: anchor, relatedTricks: [], note: text });
   updateFlagBadge();
   renderReviewNote();
 }

@@ -395,7 +395,7 @@ html, body {
   box-shadow: 0 12px 40px rgba(0,0,0,0.6);
   color: #e2e8f0; font-size: 0.64rem;
 }
-#review-sheet .btn { padding: 4px 10px; font-size: 0.7rem; }
+#review-sheet .btn { padding: 3px 9px; font-size: 0.62rem; }
 /* When reviewing, left-align the trick zone + auction so the cards sit on the left and the box owns the right */
 #game-root.reviewing #center-col { justify-content: flex-start; padding-left: 34px; }
 /* The auction table shown in the centre at the Bidding step */
@@ -409,19 +409,11 @@ html, body {
 .step-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .flag-x { margin-left: auto; background: transparent; border: none; color: #94a3b8; cursor: pointer; font-size: 0.95rem; }
 
-/* Note-per-trick (anchors to the trick in view) */
+/* Note-per-step (one note per trick / Bidding, anchored to the step in view) */
 .note-line { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
 .note-lbl { color: #cbd5e1; font-weight: 700; }
-.note-sub { color: #94a3b8; font-size: 0.6rem; margin-left: auto; }
 .note-ta { width: 100%; min-height: 38px; resize: vertical; margin: 5px 0; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: #e2e8f0; padding: 5px 7px; font: inherit; box-sizing: border-box; }
 .note-ta.note-need { border-color: #f87171; }
-.note-list { max-height: 76px; overflow-y: auto; margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 6px; }
-.note-empty { color: #64748b; font-size: 0.74rem; padding: 4px 0; }
-.note-row { display: flex; align-items: center; gap: 6px; padding: 3px 0; }
-.note-row-t { color: #fde047; font-weight: 700; flex-shrink: 0; }
-.note-row-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #cbd5e1; }
-.note-mini { background: #334155; border: none; color: #e2e8f0; border-radius: 6px; padding: 2px 8px; cursor: pointer; font-size: 0.72rem; }
-.note-mini.note-del { background: #7f1d1d; }
 #flag-count { font-size: 0.58rem; font-weight: 700; background: #dc2626; color: #fff; border-radius: 8px; padding: 0 4px; margin-left: 1px; vertical-align: super; }
 
 /* ── Portrait / phone layout (overlapping fan hands, fluid fill) ───────────────── */
@@ -509,8 +501,5 @@ html, body {
   .review-head .step-btn { width: 9vw; height: 8vw; font-size: 4vw; }
   #review-auction .auction-table { font-size: 3.4vw; }
   .note-lbl { font-size: 3.2vw; }
-  .note-sub { font-size: 2.7vw; }
   .note-ta { min-height: 16vw; font-size: 3vw; }
-  .note-row-text { font-size: 2.9vw; }
-  .note-mini { font-size: 2.7vw; padding: 1vw 2.6vw; }
 }
