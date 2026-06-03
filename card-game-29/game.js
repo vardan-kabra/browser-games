@@ -263,7 +263,8 @@ function startHand() {
   state.trickPoints    = [0, 0];
   state.lastTrickWinner = null;
   state.trickCount     = 0;
-  setReviewBtnEnabled(false);   // the review unlocks only once this hand concludes
+  setReviewBtnEnabled(false);   // the review + export unlock only once this hand concludes
+  setExportBtnEnabled(false);
 
   setPhase(PHASE.BIDDING);
   renderAll();
@@ -1079,6 +1080,7 @@ function concludeHand(resultBanner, showPanel) {
       state.reviewMode = 'original';
       renderReview();
       setReviewBtnEnabled(true);
+      setExportBtnEnabled(true);
       hideRevealBanner();
       showPanel();
     }, 2600);
@@ -1086,7 +1088,7 @@ function concludeHand(resultBanner, showPanel) {
     state.reviewMode = 'original';
     renderReview();
     showRevealBanner(resultBanner);
-    setTimeout(() => { hideRevealBanner(); setReviewBtnEnabled(true); showPanel(); }, 2500);
+    setTimeout(() => { hideRevealBanner(); setReviewBtnEnabled(true); setExportBtnEnabled(true); showPanel(); }, 2500);
   }
 }
 
@@ -1512,6 +1514,10 @@ function setReviewBtnEnabled(on) {
   const b = document.getElementById('review-btn');
   if (b) b.disabled = !on;
 }
+function setExportBtnEnabled(on) {
+  const b = document.getElementById('export-btn');
+  if (b) b.disabled = !on;
+}
 function reviewAvailable() {
   return state.phase === PHASE.HAND_SCORING && Array.isArray(state.tricks) && state.tricks.length > 0;
 }
@@ -1549,6 +1555,7 @@ function onShowReview() {
   if (!reviewAvailable()) { setStatus('Finish a hand first — then step through its tricks.'); return; }
   reviewOpen = true;
   state.reviewMode = 'original';
+  document.getElementById('game-root')?.classList.add('reviewing');   // shift the play area left, box owns the right
   renderReviewTrick(0);                            // start at Trick 1; step ‹ to reach Bidding
   show('review-panel', true);
 }
@@ -1556,6 +1563,7 @@ function onCloseReview() {
   reviewOpen = false;
   reviewTrickIndex = -1;
   show('review-panel', false);
+  document.getElementById('game-root')?.classList.remove('reviewing');   // re-centre the play area
   clearReviewWinner();
   showReviewAuction(false);                        // restore #center-area, hide the auction table
   for (let s = 0; s < 4; s++) renderHand(s);       // back to the full-8 face-up reveal
@@ -1636,8 +1644,6 @@ function renderReviewNote() {
     <textarea id="review-note" class="note-ta" placeholder="${atBid ? 'What about the bidding?' : 'What happened in this trick?'}">${escHtml(reviewNoteDraft.note)}</textarea>
     <div class="bid-actions">
       <button class="btn btn-primary" onclick="onSaveReviewNote()">${reviewNoteDraft.editingId ? 'Update' : 'Save note'}</button>
-      <button class="btn btn-secondary" onclick="onClearReviewNote()">Clear</button>
-      <button class="btn btn-secondary" onclick="onExportFeedback()">⬇ Export</button>
     </div>
     <div class="note-list">${list}</div>`;
 }
@@ -1659,7 +1665,6 @@ function onSaveReviewNote() {
   updateFlagBadge();
   renderReviewNote();
 }
-function onClearReviewNote() { reviewNoteDraft = { note: '', editingId: null }; renderReviewNote(); }
 function onEditReviewNote(id) {
   const f = feedbackLog.getFlags().find(x => x.id === id);
   if (!f) return;

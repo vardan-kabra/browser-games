@@ -389,28 +389,31 @@ html, body {
 /* The compact box docks to the RIGHT of the centre trick zone (absolute within the overlay),
    vertically centred — clear of the South fan (bottom) and the East fan (right column). */
 #review-sheet {
-  position: absolute; left: 63%; top: 47%; transform: translateY(-50%);
-  width: 196px; max-height: 58%; overflow-y: auto;
-  background: #1e293b; border-radius: 10px; padding: 7px 9px;
+  position: absolute; left: 62%; top: 47%; transform: translateY(-50%);
+  width: 166px; max-height: 56%; overflow-y: auto;
+  background: #1e293b; border-radius: 10px; padding: 6px 8px;
   box-shadow: 0 12px 40px rgba(0,0,0,0.6);
-  color: #e2e8f0; font-size: 0.72rem;
+  color: #e2e8f0; font-size: 0.64rem;
 }
+#review-sheet .btn { padding: 4px 10px; font-size: 0.7rem; }
+/* When reviewing, left-align the trick zone + auction so the cards sit on the left and the box owns the right */
+#game-root.reviewing #center-col { justify-content: flex-start; padding-left: 34px; }
 /* The auction table shown in the centre at the Bidding step */
 #review-auction { display: flex; align-items: center; justify-content: center; }
 #review-auction .auction-table { font-size: 0.82rem; }
 #review-auction .auction-table th, #review-auction .auction-table td { padding: 3px 12px; }
-.review-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-.review-count { font-weight: 800; color: #fde047; min-width: 84px; text-align: center; }
-.review-meta { color: #94a3b8; font-size: 0.74rem; flex: 1; }
-.review-head .step-btn { width: 30px; height: 28px; font-size: 1rem; }
+.review-head { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+.review-count { font-weight: 800; color: #fde047; font-size: 0.72rem; min-width: 56px; text-align: center; }
+.review-meta { color: #94a3b8; font-size: 0.6rem; flex: 1; }
+.review-head .step-btn { width: 24px; height: 22px; font-size: 0.9rem; }
 .step-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .flag-x { margin-left: auto; background: transparent; border: none; color: #94a3b8; cursor: pointer; font-size: 0.95rem; }
 
 /* Note-per-trick (anchors to the trick in view) */
 .note-line { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
 .note-lbl { color: #cbd5e1; font-weight: 700; }
-.note-sub { color: #94a3b8; font-size: 0.72rem; margin-left: auto; }
-.note-ta { width: 100%; min-height: 48px; resize: vertical; margin: 6px 0; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: #e2e8f0; padding: 6px 8px; font: inherit; box-sizing: border-box; }
+.note-sub { color: #94a3b8; font-size: 0.6rem; margin-left: auto; }
+.note-ta { width: 100%; min-height: 38px; resize: vertical; margin: 5px 0; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: #e2e8f0; padding: 5px 7px; font: inherit; box-sizing: border-box; }
 .note-ta.note-need { border-color: #f87171; }
 .note-list { max-height: 76px; overflow-y: auto; margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 6px; }
 .note-empty { color: #64748b; font-size: 0.74rem; padding: 4px 0; }
@@ -500,6 +503,7 @@ html, body {
   /* review box docks at the TOP in portrait (keeps the bottom South fan + centre cards visible) */
   #review-panel { align-items: flex-start; }
   #review-sheet { position: static; left: auto; top: auto; transform: none; width: 94vw; max-width: none; font-size: 3vw; max-height: 42vh; padding: 2.4vw 3vw; margin-top: 2vw; }
+  #game-root.reviewing #center-col { justify-content: center; padding-left: 0; }   /* no left-shift in portrait */
   .review-count { font-size: 3.4vw; min-width: 30vw; }
   .review-meta { font-size: 2.7vw; }
   .review-head .step-btn { width: 9vw; height: 8vw; font-size: 4vw; }

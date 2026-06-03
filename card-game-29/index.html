@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>29 — Card Game</title>
-  <link rel="stylesheet" href="style.css?v=12" />
+  <link rel="stylesheet" href="style.css?v=13" />
 </head>
 <body>
 
@@ -20,6 +20,7 @@
     <div id="toolbar-icons">
       <button class="tb-btn" id="cardstyle-btn" title="Card style: graphic — tap to switch" onclick="onToggleCardStyle()">🂠</button>
       <button class="tb-btn" id="review-btn" title="Review this hand's tricks" onclick="onShowReview()" disabled>🔁<span id="flag-count" hidden>0</span></button>
+      <button class="tb-btn" id="export-btn" title="Export this hand's feedback (JSON)" onclick="onExportFeedback()" disabled>⬇</button>
       <button class="tb-btn" title="Scorecard" onclick="onShowScorecard()">🗒</button>
       <button class="tb-btn" title="How to play" onclick="onShowRules()">?</button>
       <button class="tb-btn" title="New match" onclick="onNewMatch()">⟳</button>
@@ -241,6 +242,6 @@
 <script src="cards.js?v=10"></script>
 <script src="ai.js?v=10"></script>
 <script src="feedback.js?v=12"></script>
-<script src="game.js?v=12"></script>
+<script src="game.js?v=13"></script>
 </body>
 </html>
