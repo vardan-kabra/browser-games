@@ -24,3 +24,6 @@ UI Screenshots/
 
 # Screenshot workflow (Puppeteer captures)
 temporary screenshots/
+
+# Skill-creator eval scratch (test runs for the tune-29-ai skill — not part of the skill itself)
+.claude/skills/*-workspace/
