@@ -96,6 +96,8 @@ State lives in one mutable `state` object; `state.phase` (`PHASE`) drives the ma
 
 - **Settings screen** — surface `RULE_OPTIONS` to the player (toggle Double/Redouble, and later alternate bidding/scoring variants). Double/Redouble is currently flag-gated **off** (it was too swingy: a redoubled tier-2 hand is ±8, ending a ±6 match in one hand); re-tune the stakes / AI eagerness before re-enabling.
 - **AI calibration** (`AI_TUNING` at the top of `ai.js`) — the C2 bidding ceilings and C9 single-hand thresholds are Monte-Carlo *directional*, not exact. They're surfaced as named constants precisely so they can be re-tightened against stronger agents / real play without touching the heuristic bodies.
+- **Offline self-play AI-tuning harness** (the realistic "engine") — a headless Node/JS simulator that plays many AI-vs-AI (or vs a reference policy) games, scores variants, and **auto-tunes `AI_TUNING` + new heuristics by measured win/score**, staying dependency-free (no build, runs offline). Complements the human-feedback loop: the `tune-29-ai` skill + `card-game-29/29 AI Improvement Log.md` say *what* heuristics to add/fix; the harness tunes *how much*. A natural extension of the AI-calibration bullet above.
+- **RL / neural-net AI** (ambitious end-state) — train a 29 policy by self-play offline (Python RL, or CFR for the imperfect-information bidding/hidden hands), then either **distill it into improved JS heuristics/tables** or **ship a tiny net with hand-rolled JS inference**. Most powerful, but the biggest departure from the no-build / dependency-free design and a multi-week research effort.
 - **Portrait layout** is a first pass (vw-sized overlapping fans) — fine-tune card sizes/spacing on real phones.
 
 ## Bulls and Cows — Training Mode Context
