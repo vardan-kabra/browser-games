@@ -55,7 +55,10 @@ tracks the count.
 - **Trump is concealed** until revealed: opponents (non-bidders) do **not** know the trump suit. A
   card played while trump is concealed is `inertTrump` (acts ordinary). This matters enormously for
   judging "wasteful" plays — see the hindsight caveat below.
-- **Reveal-to-ruff:** a player void in the led suit may reveal the trump and then must play a trump.
+- **Reveal-to-ruff (a discovery gamble):** **non-declarers do not know the trump.** A player void in
+  the led suit may *reveal* it — which flips the trump face-up for everyone — and must then ruff if it
+  holds the now-revealed suit, else discard. So revealing is how a defender *discovers and uses* the
+  trump, at the cost of telling everyone. Never reason as if a non-declarer already knows the trump.
 - **Marriage:** K+Q of trump shifts the bidding team's point target by ±4 (after reveal + a trick won).
 - **Claim/Concede:** a side can claim the rest if it provably wins every remaining trick.
 
@@ -84,8 +87,9 @@ the AI played with hidden information. Your value is an *honest* adjudication, s
    - **valid nuance** — a better line exists but it's subtle/situational.
    - **weak / incorrect** — the AI's play was actually fine (e.g., it already won with the cheapest
      sufficient card, or it was forced). Say so plainly; don't rubber-stamp.
-   - **by design** — the AI behaved per a documented heuristic/threshold (cite the spec). E.g.
-     `aiShouldReveal` declining a low-value reveal.
+   - **by design** — the AI behaved per a documented heuristic/threshold (cite the spec). But check
+     whether the *threshold itself* is what's in question — e.g. a declined reveal may be by-design OR
+     a sign the reveal heuristic is too conservative; reason it through, don't reflexively bless it.
    - **hindsight (concealed trump)** — the critique only holds with full knowledge the AI didn't
      have (the opponent couldn't know the trump suit / others' hands). Record it, but flag it as not
      actionable as a bug.
@@ -102,6 +106,13 @@ the AI literally cannot "save its trumps" or "ruff" until a reveal. Many natural
 ("don't waste your clubs", "you should have ruffed") are **full-knowledge hindsight**. The legitimate
 forward-looking question is usually subtler (e.g., "should the AI husband high cards under unknown
 trump?"). Name the distinction every time it applies — it keeps the log trustworthy.
+
+**But the reveal is the escape hatch — don't lump it in with hindsight.** A void player can *reveal*
+to discover and use the trump (a gamble: it learns the trump only by revealing, then must ruff if it
+holds it). So "should the AI have revealed?" is a real, forward-looking question — reason about the
+gamble's upside (ruff a worth-it trick) vs its cost (revealing activates trump for everyone, which
+tends to help a strong-trump declarer). And, again: a non-declarer cannot "know it's void in trump"
+before revealing, so never use that as a reason to dismiss a reveal critique.
 
 ### 4. Write the log entry
 Append to `card-game-29/29 AI Improvement Log.md`, matching its existing format:

@@ -1,7 +1,7 @@
 # 29 — AI Improvement Log
 
 > **STATUS: collecting feedback — do NOT change the AI engine yet.**
-> Games logged: **1** · Threshold before acting: **~7–8 games**.
+> Games logged: **3** · Threshold before acting: **~7–8 games**.
 > Until then, leave `ai.js` untouched (`AI_TUNING`, `aiPlayCard`/`aiLead`/`aiFollowSuit`/`aiDiscard`,
 > `aiBidValue`/`aiBidValueAgainstHolder`). Accumulate hands, distill the recurring patterns under
 > **Candidate AI changes**, then make the changes + re-verify in one focused pass.
@@ -29,13 +29,22 @@
    - *Candidate:* before the lowest-card fallback, if the AI holds the top unplayed card of a suit,
      cash down that suit (needs played-card tracking vs. the 8-card suit). Highest value in **No Trump**.
 
-2. **Overtake-for-control exception (following).** `aiFollowSuit` (ai.js:284–300) and `aiDiscard`
-   (ai.js:307–327, the C8 rule) **always duck under a winning partner** (`partnerWinning → lowestCard`).
-   No exception for "I hold the long solid suit — overtake to seize the lead and run it."
-   - *Evidence:* Game 1 / **f2** (valid nuance) — trick 2, partner East winning with ♣10; West
-     (holding ♣J/9/A — the long club suit) dumped ♣7 instead of overtaking with ♣J to take control.
-   - *Candidate:* permit a deliberate overtake when the AI holds a long, top-heavy suit and seizing
-     the lead lets it cash several tricks (NT especially). Careful — overtaking a partner is usually wrong.
+2. **Bank high-point winners; don't blindly dump under a beatable partner.** *(Top recurring theme —
+   5 hands so far.)* Two rules in `aiFollowSuit` (ai.js:284–300) leak points: (a) **"partner winning →
+   dump lowest"** (:289–291) ducks even when the partner's winning card can still be beaten by an
+   un-played seat and the AI holds the boss; (b) **"win with the lowest winning card"** (:296) cashes
+   the cheapest winner even when the AI holds a high-**point** winner (J=3 / 9=2) that's about to be
+   stranded or ruffed. Both throw away points of high cards the AI could have banked.
+   - *Evidence:* Game 1 f2 (ducked ♣7 under partner instead of overtaking ♣J for control); hand 3 f1
+     (won trick 1 with ♥9 not the at-risk ♥J); hand 4 f2 (ducked ♣Q keeping ♣J → swept by a claim);
+     **hand 9 f2** (3rd hand dumped ♥K under partner's ♥10 — but West's ♥9 beats ♥10; North held the
+     boss ♥J and should have secured it); **hand 9 f3/f4** (won trick 4 with ♣A not ♣J; the kept ♣J was
+     ruffed by East at trick 5 for −4, then East claimed → the contract failed).
+   - *Candidate:* in `aiFollowSuit`, (i) when a partner is "winning" but an un-played seat can still
+     beat that card, **secure the trick with your master**; (ii) when you'll win anyway, prefer winning
+     with a **high-point** card (J/9) if it's at risk of being ruffed/stranded, not the cheapest winner.
+     Unifying rule: **bank the points of high cards you can't safely keep.** (Still be careful —
+     overtaking a *safe* partner winner is usually wrong.)
 
 ### No-Trump play (root cause of the play flags)
 3. The play logic is **trump-centric**; there is **no No-Trump-specific strategy** (establish + cash
@@ -57,6 +66,41 @@
      a K/Q" reflects a K/Q-centric (bridge/whist) mental model; the AI rightly ignores K/Q. The real
      question is the **weight** on J/9 + length, not the absence of K/Q. (For the record the AI hands
      *did* hold high cards: E had K♠/K♦/Q♦/K♥; W had A♣/A♥/Q♠/Q♣/J♣.)
+   - *Other direction (hand 9 / f1):* the model also **under-values strong-but-short suits**. North's
+     3-card **J-9-A of clubs** + a second jack (♥J), ~10 pts, fell to the `weakCeiling` (16) because
+     `aiBidValue` gates the mid/strong bands on a **4-card** suit — then the C12 score-lean (N–S ahead
+     by 5) shaved another point, so North capped ~17 and passed where the user expected 18–19. So the
+     valuation errs in *both* directions (over-values shape+J9 on thin hands, under-values short-strong
+     suits + multi-jack hands). *Caveat:* the hand still **failed** at 18 — the real loss there was the
+     **play** (Candidate #2), not the bid; logged as a valuation data point, not "bid higher."
+
+### Declarer play — `ai.js`
+5. **Declarer over-draws trump / is blind to its own (concealed) trump.** When the AI is the
+   **declarer**, `aiPlayCard`/`aiLead` still receive `effectiveTrump()` = `null` while the trump is
+   concealed, so the declarer can't see its *own* trump suit. Consequences: it may **lead its own
+   trump** (to `aiLead` it just looks like the longest suit), and it keeps **drawing trumps after both
+   opponents are already void** — pulling only its partner's trumps — instead of switching to a side suit.
+   - *Evidence:* Game 2 (hand 8) / **f2 + f3** — North (declarer, ♣ trump) drew East's only club at
+     trick 2, then kept leading ♣K/♣10 at tricks 4–5 (E & W already void) before finally turning to
+     hearts at trick 6 — straight into East's boss ♥J, leaking two 10-point cards.
+   - *Candidate:* give the declarer its **known** trump for play decisions (it chose it); have
+     `aiLead` avoid leading its own trump, **stop drawing trumps once both opponents are void**, and
+     develop a side suit. Distinct from the defender-side themes above.
+
+### Concealed-trump / reveal — `ai.js`
+6. **Reveal-gamble aggressiveness.** `aiShouldReveal` (ai.js:196–221) lets a **non-declarer** reveal
+   only when the trick is worth ≥2 points **and** it holds a non-led **J/9** to ruff with. Because the
+   reveal is a *discovery* (a non-declarer doesn't know the trump until it asks) and *not* holding the
+   revealed suit merely costs a discard, this threshold may be **too conservative** — a high non-led
+   card (A/K/10) could also win if its suit turns out to be trump.
+   - *Evidence:* Game 2 (hand 8) / **f1** — West (no non-led J/9) declined; the user argues it should
+     gamble on the reveal.
+   - *Counter-weight (don't over-correct):* revealing **activates trump for everyone**, which usually
+     helps a strong-trump declarer, so revealing freely can backfire for a defender. The right setting
+     weighs reveal-EV (ruff a worth-it trick) against that cost.
+   - *Candidate:* re-examine the reveal threshold (allow strong non-J/9 ruffers? factor "am I likely
+     just waking the declarer's trumps?"). **Important framing fix:** never evaluate a reveal as if the
+     player already knows the trump — it doesn't until it reveals.
 
 ## Game log
 
@@ -94,3 +138,94 @@ points (match: We −2 / They 0). Played out; no marriage; trump never relevant 
 **Net for Game 1:** one strong play bug (f4 → cash winners), one valid play nuance (f2 →
 overtake-for-control), one over-harsh flag (f3), one bidding-tuning data point (f1). The cross-cutting
 root cause behind the play flags: **the engine has no No-Trump strategy.**
+
+### Game 2 — match `m-1780548206076` · hand 8 · 2026-06-04
+**Contract:** **North (AI)** bid **18, trump ♣** (revealed trick 7). **Result: MADE** — N–S took
+**24** of 18 needed, **+1** (match We 5 / They 0). First logged hand where the **AI partner declared**.
+
+**Bidding recap:** S 16 → E 17 → S 17 → E pass → **N 18** → S pass → W pass.
+
+**Tricks** (♣ = concealed trump until trick 7; winner in **bold**). ⚠ trick 1 & 7 have move-log
+glitches (see Non-AI follow-ups) — the clean reconstruction is shown:
+1. S♠8 E♠9 **N♠J** W♠Q → N +5  *(log prepends two phantom plays "S♥8" / "E♦A" — not in those hands)*
+2. **N♣J** W♥8 S♣9 E♣8 → N +5
+3. **N♦J** W♦8 S♥A E♦7 → N +4
+4. **N♣K** W♦K S♣7 E♠7 → N +0
+5. **N♣10** W♥K S♣Q E♥Q → N +1
+6. N♥10 W♦10 S♥7 **E♥J** → E +5
+7. E♦Q **N♣A** (ruff) W♦A S♠K → N +2  *(reveal logged "by S" + ♣A still flagged inertTrump — metadata bug; N is the ruffer)*
+8. **N♥9** W♠10 S♠A E♦9 → N +7 (last trick +1)
+
+**Flags:**
+- **f1 — Trick 2 (West didn't reveal):** *Corrected → valid design question* (my first pass got this
+  wrong, retracted). **Non-declarers don't know the trump** — revealing is the *discovery* gamble
+  (ask → the trump flips face-up → ruff if you hold that suit, else discard). The earlier "West is
+  void in trump, so it can't ruff" was hindsight (I knew trump = clubs) and is wrong: West can't know
+  its trump status until it reveals. What actually happened: `aiShouldReveal` declined because West
+  holds no non-led **J/9** to ruff with (its gamble threshold) — not because it "knew" anything. Is
+  that threshold too conservative? The user's instinct (reveal more readily — not holding the revealed
+  trump just costs a discard) is a legitimate tunable → **Candidate #6**. Counter-weight (why it's a
+  question, not a clear bug): revealing **activates trump for everyone**, generally aiding a
+  strong-trump declarer — and here the trump *was* the led suit (clubs) with West void, so revealing
+  would have gained nothing while helping declarer North, so declining wasn't punished *this* hand.
+  The actionable item is the reveal heuristic, not this one play.
+- **f2 — Trick 5 (North kept leading trump):** *Valid* → new **Candidate #5**. North (declarer) had
+  already drawn the opponents' only trump (East's ♣8 at trick 2); leading ♣K/♣10 at tricks 4–5 pulled
+  only partner South's trumps. Mechanism: the declarer plays blind to its own concealed trump, so
+  `aiLead` leads clubs as "the longest suit" and never stops drawing.
+- **f3 — Trick 6 (the leak):** *Valid nuance.* The trump over-draw meant North turned to hearts only
+  at trick 6, leading ♥10 into East's boss ♥J and leaking two 10-point cards (N's ♥10 + W's ♦10) for
+  East's +5. Direction is right; the exact "extra point" counterfactual would need a double-dummy solve.
+  Reinforces #5.
+
+**Net for Game 2:** f1 → *corrected* to a valid design question about reveal aggressiveness (new
+Candidate #6), not the dismissal I first wrote; f2 + f3 valid → the new **declarer trump-management**
+candidate (#5). Also surfaced a real **data-integrity bug** in the export (below) —
+worth fixing, since corrupt logs would poison this whole feedback pipeline. (Aside: North made 18
+easily with a 3-Jack monster; bidding 21 for the ±2 tier would have scored +2 not +1 — minor, unflagged.)
+
+### Game 3 — match `m-1780548206076` · hand 9 · 2026-06-04
+**Contract:** South bid **18, trump ♦** (revealed trick 5 by East). **Result: FAILED** — N–S took only
+**6** of 18, **−1** (East **claimed** at trick 6). Match We 4 / They 0. The **AI partner (North)**
+misplayed a strong hand into a rout.
+
+**Bidding recap:** E 16 → N 17 → E 17 → **N pass** → W pass → **S 18** → E pass.
+**Tricks** (♦ = concealed trump until trick 5; winner in **bold**):
+1. E♦7 N♦K W♦9 **S♦J** → S +5
+2. S♥10 E♥7 N♥K **W♥9** → W +3  *(W's ♥9 beats S's ♥10)*
+3. **W♠J** S♠8 E♠7 N♠Q → W +3
+4. W♣8 S♣7 E♣Q **N♣A** → N +1  *(N had ♣J/9/A — all winners — but took the cheapest)*
+5. N♣J W♣10 S♣K **E♦Q** (ruff) → E +4  *(trump ♦ revealed by East)*
+— then **East claims the last 3 tricks** → N–S finish 6/18.
+
+**Flags:**
+- **f1 — Bidding (North under-bid):** *Valid valuation point, with a caveat* → Candidate #4. North's
+  3-card **J-9-A clubs** + ♥J (~10 pts) only reached ~17 (weakCeiling — no 4-card suit — plus the
+  score-lean −1 when ahead), so it passed where the user wanted 18–19; the model under-rates
+  short-but-strong / multi-jack hands. *Caveat:* the hand FAILED at 18 (took 6) — the disaster was the
+  **play**, not the bid level.
+- **f2 — Trick 2 (North dumped ♥K under partner's ♥10):** *Strong, valid* → Candidate #2. South's ♥10
+  was winning but **beatable** — West (last to play) held ♥9 (beats ♥10). North, holding the boss **♥J**,
+  should have secured the trick; `aiFollowSuit`'s "partner winning → dump lowest" played ♥K, West won,
+  and the ♥J was later stranded.
+- **f3 — Trick 4 (North won with ♣A, not ♣J):** *Strong, valid* → Candidate #2. North held ♣J/9/A (all
+  beat East's ♣Q); the "win with the lowest winning card" rule took ♣A, keeping the at-risk **♣J**.
+  It should have banked the 3-point ♣J. *(Plus a UI note — see Non-AI follow-ups.)*
+- **f4 — Trick 5 (the payoff):** *Valid — confirms f2/f3.* North led the kept ♣J; East ruffed with ♦Q
+  (revealing trump) for +4 and then **claimed the rest**, sweeping North's stranded ♥J too. Banking the
+  jacks at tricks 2 and 4 would have saved those points and very likely the hand.
+
+**Net for Game 3:** the **bank-high-point-winners** theme (Candidate #2) in its clearest, costliest
+form — two un-banked jacks (♥J, ♣J) directly lost the hand (6/18, −1). Plus a bidding-valuation data
+point (under-rating short-strong suits, #4) and a UI request (trump-reveal flash too brief).
+
+## Non-AI follow-ups
+- **Move-log capture bug (surfaced by the hand-8 export).** Trick 1 carries two **phantom plays** —
+  `S ♥8` and `E ♦A`, cards not in those seats' deals (the real trick is the four spades
+  S♠8/E♠9/N♠J/W♠Q, N wins +5). Trick 7 attributes the **reveal to S** although **N** is the seat that
+  ruffed/won with ♣A, and that ♣A is still flagged `inertTrump`. Likely in `feedback.js`
+  `logPlay`/`trickBuf` (stale/duplicated plays) and/or `revealTrump(byWhom)` attribution. **Fix and add
+  a guard** — each trick should log exactly `trickSize` plays, each a card the seat actually holds.
+- **Trump-reveal flash too brief (UI).** When an AI reveals the trump, the on-screen indication
+  doesn't stay long enough to read (hand 9 / f3). Lengthen the reveal flash/toast by ~1 s so the
+  player can register what happened.

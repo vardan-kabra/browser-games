@@ -37,11 +37,17 @@ confirm** before citing a line. Behaviour and known gaps are the durable part.
 - **`aiDiscard(hand, trick, trumpSuit, seatIndex)`** (~307–327) — the **C8 overtake rule**: if a
   partner is winning, never trump (safe discard) unless holding only trumps; else if trump is active,
   trump to win with the **lowest winning trump**; else safe discard. Reasonable as written.
-- **`aiShouldReveal(seat, hand, trick, declarer, knownTrump)`** (~196–221) — reveal-to-ruff decision.
-  Won't reveal over a winning partner (C8). Reveals only if the trick is **worth ≥2 points** AND the
-  declarer holds the trump suit / a non-bidder holds a non-led **J/9** to ruff with. **Sound by
-  design** — low-value reveals are correctly declined (and revealing hands trump knowledge to a
-  strong declarer), so "should have revealed for 1 point" critiques are usually wrong.
+- **`aiShouldReveal(seat, hand, trick, declarer, knownTrump)`** (~196–221) — the reveal-to-ruff
+  **gamble**. **Crucial model: non-declarers do NOT know the trump.** Revealing is the *discovery*
+  action — you ask, the trump flips face-up for everyone, and then you must ruff if you hold the
+  now-revealed suit, else you discard. Never reason as if a non-declarer "knows it's void in trump":
+  it cannot know until it reveals. The function reflects this correctly: the **declarer** reveals if a
+  worth-it trick and it holds its known trump; a **non-bidder gambles** — reveals only if the trick is
+  **worth ≥2 points** AND it holds a non-led **J/9** to ruff with (it does NOT peek at `knownTrump` —
+  good). That J/9 threshold is a **tunable design choice, not settled-correct**: weigh the upside
+  (ruff a worth-it trick) against the cost — **revealing activates trump for everyone**, which tends
+  to help a strong-trump declarer. So "the AI should reveal more" is a legitimate question; do **not**
+  reflexively bless a declined reveal as "by design."
 
 ## Recurring candidate themes (with the evidence so far)
 1. **Overtake to bank a high-point card** — `aiFollowSuit` (:289–291). Seen Game 1 f2, Game 2 (hand 3)
@@ -51,5 +57,9 @@ confirm** before citing a line. Behaviour and known gaps are the durable part.
 3. **No-Trump strategy absent** — root of several Game-1 play flags.
 4. **Bidding valuation** — `aiBidValue`/`AI_TUNING.bid`. Game 1 f1 (length+J9 over-bids a 7-pt hand
    to 22) and Game 3 f1 (ignores K-Q marriage → under-bids a marriage hand). Needs a two-sided look.
-5. **Concealed-trump play / reveal** — Game 2 f4/f5 were defensible/hindsight; the `aiShouldReveal`
-   worth-it ≥2 threshold is sound. Mostly *not* bugs.
+5. **Concealed-trump play / reveal gamble** — non-declarers don't know the trump; revealing is a
+   discovery gamble. The `aiShouldReveal` threshold (worth-it ≥2 **and** a non-led J/9) is a
+   **tunable**, not "sound": upside = ruff a worth-it trick; cost = activating trump aids a
+   strong-trump declarer. Evidence: hand 8 f1 (the AI declined; whether it *should* is a real
+   question). Hand 3 f4/f5 are still genuine full-knowledge hindsight (opponent couldn't know clubs
+   were trump).
