@@ -131,7 +131,7 @@ html, body {
   0%, 100% { box-shadow: 0 0 0 0 rgba(253,224,71,0); }
   50%      { box-shadow: 0 0 0 3px #fde047, 0 0 14px 4px rgba(253,224,71,0.8); }
 }
-.reveal-flash { animation: revealFlash 0.5s ease-in-out 3; }
+.reveal-flash { animation: revealFlash 0.5s ease-in-out 5; }
 
 /* ── Table grid ─────────────────────────────────────────────────────────────── */
 #table {

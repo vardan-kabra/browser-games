@@ -11,6 +11,8 @@ const AI_TUNING = {
     veryStrong: { ptsMin:12,            ceilingLo:21, ceilingHi:22 },  // needs 4-card suit
     fiveSuitBonus:   2,                    // +2 to band ceiling if a 5+ card suit
     perTrumpHonour:  1,                    // +1 per J/9 in the chosen trump candidate
+    marriageBonus:   1,                    // +1 if the trump candidate holds K+Q (a marriage, ±4 target)
+    shapeStackPtsMin: 8,                   // below this, cap the (5-suit + honour) shape stack at +2
     hardCap:        22,                    // never auto-bid past 22 — 28/29 only on a near-lock
   },
   partner:  { supportPtsMin: 10, takeoverSuitMin: 4, supportMax: 20 },   // C2 partner rule
@@ -65,16 +67,29 @@ function aiBidValue(hand, lean) {
   const honours = honoursInSuit(sc);
   const T = AI_TUNING.bid;
 
+  // A 3-card suit headed by a J/9 plus an A or K (e.g. J-9-A, J-9-K, J-A) plays like a
+  // short trump — strong enough to bid on, so it isn't dumped to the weakCeiling by the
+  // 4-card gate. It's still weaker than a real 4-card suit, so it caps one tier lower.
+  const strong3 = suitLen === 3 && honours >= 1 && sc.some(c => c.rank === 'A' || c.rank === 'K');
+
   let ceiling;
   if (pts < T.midBand.ptsMin)            ceiling = T.weakCeiling;                   // <6 pts → 16
-  else if (suitLen < 4)                  ceiling = T.weakCeiling;                   // no 4-card suit → 16 only
+  else if (suitLen < 4 && !strong3)      ceiling = T.weakCeiling;                   // no 4-card / strong-3 suit → 16
   else if (pts <= T.midBand.ptsMax)      ceiling = T.midBand.ceilingLo + Math.min(pts - T.midBand.ptsMin, T.midBand.ceilingHi - T.midBand.ceilingLo);
-  else if (pts <= T.strongBand.ptsMax)   ceiling = T.strongBand.ceiling;            // 10–11 + 4-suit → 20
-  else                                   ceiling = T.veryStrong.ceilingLo +         // 12+ + 4-suit → 21–22
-                                          Math.min(Math.floor((pts - T.veryStrong.ptsMin) / 2), T.veryStrong.ceilingHi - T.veryStrong.ceilingLo);
+  else if (pts <= T.strongBand.ptsMax)   ceiling = strong3 ? T.midBand.ceilingHi : T.strongBand.ceiling;   // 10–11: 4-suit→20, strong-3→19
+  else                                   ceiling = strong3 ? T.midBand.ceilingHi   // 12+: strong-3 caps at 19
+                                          : T.veryStrong.ceilingLo + Math.min(Math.floor((pts - T.veryStrong.ptsMin) / 2), T.veryStrong.ceilingHi - T.veryStrong.ceilingLo);
 
-  if (suitLen >= 5) ceiling += T.fiveSuitBonus;          // +2 for a 5+ card suit
-  ceiling += honours * T.perTrumpHonour;                  // +1 per J/9 of the trump candidate
+  // Shape bonuses (5-card length + J/9 honours). On thin hands (<8 pts) cap the stack at +2
+  // so a shapely 7-pointer can't ride length+J9 all the way to the 22 cap.
+  if (pts >= T.midBand.ptsMin) {
+    let shape = (suitLen >= 5 ? T.fiveSuitBonus : 0) + honours * T.perTrumpHonour;
+    if (pts < T.shapeStackPtsMin) shape = Math.min(shape, 2);
+    ceiling += shape;
+  }
+  // Marriage (K+Q of the trump candidate) shifts the target ±4 — give it a small bump.
+  if (sc.some(c => c.rank === 'K') && sc.some(c => c.rank === 'Q')) ceiling += T.marriageBonus;
+
   ceiling = Math.min(ceiling, T.hardCap);                 // hard 22 cap
   ceiling += (lean || 0);                                  // C12 score-lean + C2 support-raise
   return Math.max(0, ceiling);
@@ -215,9 +230,12 @@ function aiShouldReveal(seat, hand, trick, declarer, knownTrump) {
   const nonLed = hand.filter(c => c.suit !== ledSuit);
   if (!nonLed.length) return false;                            // nothing to ruff with
   const honoursNonLed = nonLed.filter(c => c.rank === 'J' || c.rank === '9').length;
-  // Reveal only if the trick is worth it AND the AI has at least one J/9 across non-led
-  // suits — a non-trivial top card to ruff with.
-  return worthIt && honoursNonLed >= 1;
+  // A J/9 across non-led suits is a strong ruffer → reveal if the trick is worth it (≥2).
+  if (honoursNonLed >= 1) return worthIt;
+  // A bare Ace can also win a ruff, but revealing wakes trump for everyone (it usually helps
+  // a strong-trump declarer), so only gamble it on a richer trick (≥3 points). K/10 too weak.
+  if (nonLed.some(c => c.rank === 'A')) return trickPts >= 3;
+  return false;
 }
 
 // ── AI: Card play ─────────────────────────────────────────────────────────────
@@ -230,12 +248,15 @@ function aiShouldReveal(seat, hand, trick, declarer, knownTrump) {
  * `trumpSuit`  — null if hidden, string if revealed
  * `declarerIndex` — who holds trump knowledge (for "call for trump" logic)
  * `seatIndex`  — this AI's seat (0-3)
+ * `seen`       — optional card-tracking { played:Set<cardKey>, toActAfter:[seats], declarerTrump }
+ *                supplied by game.js. When omitted (null), all enhanced branches are skipped and
+ *                the function behaves exactly as the original (kept for purity + regression tests).
  */
-function aiPlayCard(hand, trick, trumpSuit, declarerIndex, seatIndex) {
+function aiPlayCard(hand, trick, trumpSuit, declarerIndex, seatIndex, seen = null) {
   const isLeading = trick.length === 0;
 
   if (isLeading) {
-    return aiLead(hand, trumpSuit);
+    return aiLead(hand, trumpSuit, seen);
   }
 
   const ledSuit = trick[0].card.suit;
@@ -243,7 +264,7 @@ function aiPlayCard(hand, trick, trumpSuit, declarerIndex, seatIndex) {
   const canFollow = legal.some(c => c.suit === ledSuit);
 
   if (canFollow) {
-    return aiFollowSuit(legal.filter(c => c.suit === ledSuit), trick, trumpSuit, ledSuit, seatIndex);
+    return aiFollowSuit(legal.filter(c => c.suit === ledSuit), trick, trumpSuit, ledSuit, seatIndex, seen);
   } else {
     return aiDiscard(hand, trick, trumpSuit, seatIndex);
   }
@@ -257,43 +278,82 @@ function aiPlayCard(hand, trick, trumpSuit, declarerIndex, seatIndex) {
  *     of these, "lowest rank" never selects a bare 9 unless it is literally the only card.
  *  3. Trumps are led only when nothing else is left.
  */
-function aiLead(hand, trumpSuit) {
+function aiLead(hand, trumpSuit, seen = null) {
   if (!hand || hand.length === 0) return null;
   const inSuit = (suit) => hand.filter(c => c.suit === suit);
+  // Avoid leading our own trump. While trump is concealed the declarer still knows it
+  // (seen.declarerTrump) — without this it would lead its own hidden trump as "the longest suit"
+  // and over-draw it. `trumpSuit` is the active (revealed) trump for everyone.
+  const avoidSuit = trumpSuit || (seen && seen.declarerTrump) || null;
 
-  // 1) Lead a Jack we hold in a non-trump suit (prefer the longest such suit for follow-up).
-  const jackSuits = SUITS.filter(s => s !== trumpSuit && inSuit(s).some(c => c.rank === 'J'));
+  // 1) Lead a Jack we hold in a non-avoid suit (prefer the longest such suit for follow-up).
+  const jackSuits = SUITS.filter(s => s !== avoidSuit && inSuit(s).some(c => c.rank === 'J'));
   if (jackSuits.length) {
     jackSuits.sort((a, b) => inSuit(b).length - inSuit(a).length);
     return inSuit(jackSuits[0]).find(c => c.rank === 'J');
   }
 
-  // 2) Lead the lowest zero-point card, preferring non-trump.
+  // 2) Cash established winners: if we hold the boss (highest unseen card) of a non-avoid suit,
+  //    run the longest such suit, leading its highest boss. Needs played-card tracking (`seen`).
+  if (seen) {
+    const bossSuits = SUITS.filter(s => s !== avoidSuit && inSuit(s).some(c => isBoss(c, hand, seen)));
+    if (bossSuits.length) {
+      bossSuits.sort((a, b) => inSuit(b).length - inSuit(a).length);
+      const bosses = inSuit(bossSuits[0]).filter(c => isBoss(c, hand, seen));
+      return highestCard(bosses);
+    }
+  }
+
+  // 3) Lead the lowest zero-point card, preferring a non-avoid suit.
   const lowestZero = (cards) => {
     const zero = cards.filter(c => POINT_VALUE[c.rank] === 0);
     const pool = zero.length ? zero : cards;
     return pool.reduce((lo, c) => RANK_ORDER[c.rank] < RANK_ORDER[lo.rank] ? c : lo);
   };
-  const nonTrump = hand.filter(c => c.suit !== trumpSuit);
-  return lowestZero(nonTrump.length ? nonTrump : hand);
+  const nonAvoid = hand.filter(c => c.suit !== avoidSuit);
+  return lowestZero(nonAvoid.length ? nonAvoid : hand);
 }
 
 /**
  * Must follow suit. Decide whether to try to win or dump.
  */
-function aiFollowSuit(following, trick, trumpSuit, ledSuit, seatIndex) {
+function aiFollowSuit(following, trick, trumpSuit, ledSuit, seatIndex, seen = null) {
   const currentWinner = trickCurrentWinner(trick, trumpSuit);
   const partnerIndex = (seatIndex + 2) % 4;
   const partnerWinning = currentWinner === partnerIndex;
 
   if (partnerWinning) {
-    // Partner is winning — dump the lowest card to save good cards
-    return lowestCard(following);
+    // (i) Secure a BEATABLE partner trick. Default is to dump low and trust the partner —
+    //     but if the partner's winning card is NOT the boss of the led suit, an opponent
+    //     still plays after us, and we hold a master (a card that beats it and is itself the
+    //     boss), take the trick with our cheapest master instead. Gated to concealed/no trump
+    //     (`!trumpSuit`) so we don't expose a master to a ruff when trump is live.
+    if (seen && !trumpSuit) {
+      const pc = trick.find(t => t.playerIndex === partnerIndex);
+      const partnerCard = pc && pc.card;
+      const oppToAct = (seen.toActAfter || []).some(s => !_samePartnership(s, seatIndex));
+      if (partnerCard && oppToAct && !isBoss(partnerCard, following, seen)) {
+        const masters = following.filter(c =>
+          cardBeats(c, partnerCard, ledSuit, trumpSuit) && isBoss(c, following, seen));
+        if (masters.length) return lowestCard(masters);   // cheapest sufficient master
+      }
+    }
+    return lowestCard(following);                          // partner safe → dump low
   }
 
-  // Try to win with lowest winning card
+  // Try to win.
   const winning = following.filter(c => trickBeatsAll(c, trick, ledSuit, trumpSuit));
-  if (winning.length) return lowestCard(winning);
+  if (winning.length) {
+    // (ii) When we'll surely win and hold several winners in a NON-trump suit, bank the
+    //      highest-POINT winner (a J=3/9=2 we'd otherwise keep can be ruffed/stranded later).
+    //      "Surely win" = we're last to act, or (trump concealed) our winner is the led-suit boss.
+    if (seen && winning.length > 1 && ledSuit !== trumpSuit) {
+      const lastToAct = (seen.toActAfter || []).length === 0;
+      const bossWin = !trumpSuit && winning.some(c => isBoss(c, following, seen));
+      if (lastToAct || bossWin) return highestPointCard(winning);
+    }
+    return lowestCard(winning);                            // default: cheapest sufficient winner
+  }
 
   // Can't win — dump lowest
   return lowestCard(following);
@@ -357,6 +417,28 @@ function highestCard(cards) {
   return cards.reduce((high, c) =>
     RANK_ORDER[c.rank] > RANK_ORDER[high.rank] ? c : high
   );
+}
+
+// Highest-POINT card; tie-break to the LOWER rank so we bank points as cheaply as possible.
+function highestPointCard(cards) {
+  return cards.reduce((best, c) =>
+    (POINT_VALUE[c.rank] > POINT_VALUE[best.rank] ||
+     (POINT_VALUE[c.rank] === POINT_VALUE[best.rank] && RANK_ORDER[c.rank] < RANK_ORDER[best.rank]))
+      ? c : best);
+}
+
+// True iff `card` is the boss of its suit from our seat's view — every higher-ranked card of
+// that suit is already played (in seen.played) or in our own hand. Exact for a 4-player full
+// deal. Returns false when `seen` is null (no card tracking → no boss reasoning).
+function isBoss(card, myHand, seen) {
+  if (!seen || !seen.played) return false;
+  for (const rank in RANK_ORDER) {
+    if (RANK_ORDER[rank] <= RANK_ORDER[card.rank]) continue;           // only strictly higher cards
+    if (seen.played.has(rank + '-' + card.suit)) continue;            // already played
+    if (myHand.some(c => c.rank === rank && c.suit === card.suit)) continue;  // we hold it
+    return false;                                                      // a higher card is still out
+  }
+  return true;
 }
 
 /** Discard lowest-point card; prefer zero-point cards */

@@ -39,6 +39,7 @@ const feedbackLog = (() => {
   let running   = { we: 0, they: 0 };
   let endNote   = null;     // { reason, atTrick, by, awardedToTeam } set by noteEnd
   let flagSeq   = 0;
+  let trickBuf  = { leader: null, plays: [] };   // in-progress trick buffer; reset each hand + each resolved trick
 
   const storageKey = () => `cg29-fb-${matchId}-h${hand ? hand.number : 0}`;
   function saveFlags() {

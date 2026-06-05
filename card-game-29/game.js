@@ -604,6 +604,17 @@ function beginPlay() {
   scheduleAdvance(400);
 }
 
+// Show the South Claim/Concede chips whenever it's the human's live turn — and only then.
+// Called from advancePlay and after any transient overlay closes (reveal prompt, marriage,
+// rejected claim) so the declarer can always Claim/Concede on their turn, INCLUDING before
+// revealing trump (onClaim evaluates with the real state.trumpSuit regardless of reveal state).
+function refreshActionChips() {
+  const live   = state.phase === PHASE.PLAYING && isHuman(state.activePlayer) && !state.resolving;
+  const canAct = live && !isSittingOut(0);
+  show('claim-btn',  canAct && tricksRemaining() >= 2);   // claim needs ≥2 tricks (§8)
+  show('giveup-btn', canAct);                             // concede available any of the human's turns
+}
+
 function advancePlay() {
   if (state.trickCount === 8) { finishHand(); return; }
 
@@ -615,9 +626,7 @@ function advancePlay() {
   if (isHuman(state.activePlayer)) {
     state.forceTrumpOnly = false;
     renderHand(0);
-    const canAct = !isSittingOut(0);
-    show('claim-btn', canAct && tricksRemaining() >= 2);   // claim needs ≥2 tricks (§8)
-    show('giveup-btn', canAct);                            // give up available any turn
+    refreshActionChips();                                  // Claim/Concede chips for the human's live turn
     maybePromptHumanReveal();                              // void + concealed trump → ask (Part B3)
   } else {
     show('claim-btn', false);
@@ -663,13 +672,28 @@ function doAIPlay() {
     }
   }
 
+  // Card-tracking for the play heuristics (cash established winners, secure a beatable partner):
+  // which cards are already played, which seats still play after us this trick, and — for the
+  // still-concealed declarer — its own known trump (so it doesn't lead/over-draw it).
+  const seenPlayed = new Set();
+  for (const t of state.tricks) for (const p of t.plays) seenPlayed.add(cardKey(p.card));
+  for (const t of state.currentTrick) seenPlayed.add(cardKey(t.card));
+  const toActAfter = [];
+  let _s = seat;
+  for (let i = trickSize() - state.currentTrick.length - 1; i > 0; i--) { _s = nextActiveSeat(_s); toActAfter.push(_s); }
+  const seen = {
+    played: seenPlayed,
+    toActAfter,
+    declarerTrump: (seat === state.declarer && !state.trumpRevealed && !state.isNoTrump) ? state.trumpSuit : null,
+  };
+
   let card;
   if (mustRuffWithTrump) {
     // Forced ruff — play the lowest trump card.
     const trumps = state.hands[seat].filter(c => c.suit === state.trumpSuit);
     card = lowestCard(trumps);
   } else {
-    card = aiPlayCard(state.hands[seat], state.currentTrick, effectiveTrump(), state.declarer, seat);
+    card = aiPlayCard(state.hands[seat], state.currentTrick, effectiveTrump(), state.declarer, seat, seen);
   }
   if (!card) { console.warn(`${seatName(seat)} aiPlayCard returned null — skipping`); return; }
   playCard(seat, card);
@@ -733,6 +757,7 @@ function onRevealTrump() {
   setStatus(state.forceTrumpOnly
     ? 'Trump revealed — play a trump card to ruff.'
     : 'Trump revealed — discard any card.');
+  refreshActionChips();   // reveal prompt closed — Claim/Concede available again on this turn
 }
 
 // Human pressed "Discard": keep trump concealed, play any card (they're void).
@@ -741,6 +766,7 @@ function onRevealDiscard() {
   state.forceTrumpOnly = false;
   setStatus('Discard any card.');
   renderHand(0);
+  refreshActionChips();   // reveal prompt closed — Claim/Concede available again on this turn
 }
 
 function playCard(seat, card) {
@@ -780,8 +806,8 @@ function revealTrump(byWhom) {
   renderTrumpIndicator();
   setStatus(`🔔 TRUMP REVEALED — ${SUIT_SYMBOL[state.trumpSuit]} ${state.trumpSuit.toUpperCase()}!`);
   const ind = document.getElementById('trump-card-slot');
-  if (ind) { ind.classList.add('reveal-flash'); setTimeout(() => ind.classList.remove('reveal-flash'), 1600); }
-  showToast(`🔔 Trump is ${SUIT_SYMBOL[state.trumpSuit]} ${state.trumpSuit}!`);
+  if (ind) { ind.classList.add('reveal-flash'); setTimeout(() => ind.classList.remove('reveal-flash'), 2600); }
+  showToast(`🔔 Trump is ${SUIT_SYMBOL[state.trumpSuit]} ${state.trumpSuit}!`, 2700);   // hold longer so the reveal is readable
   for (let i = 0; i < 4; i++) renderHand(i);
   // A side's Marriage window may now open (gated on having won a trick).
   setTimeout(checkForMarriage, 200);
@@ -891,6 +917,7 @@ function showMarriagePrompt() {
 function hideMarriagePrompt() {
   show('marriage-prompt', false);
   if (marriagePromptTimeout) { clearTimeout(marriagePromptTimeout); marriagePromptTimeout = null; }
+  refreshActionChips();   // marriage window closed — Claim/Concede available again on this turn
 }
 
 // ── Claim (§8) ──────────────────────────────────────────────────────────────────
@@ -921,6 +948,7 @@ function onClaimRejectOk() {
   show('claim-reject-panel', false);
   setStatus('Claim rejected — play continues. Your turn.');
   renderHand(0);                          // restore clickable hand
+  refreshActionChips();                   // chips back (Concede still available)
 }
 
 // Award every remaining trick + card-point to `toTeam`, merge the in-flight trick back
@@ -1048,14 +1076,14 @@ function hideRevealBanner() {
 
 // Transient center toast for in-play events (trump reveal, Marriage, claim) — auto-fades.
 let toastTimer = null;
-function showToast(msg) {
+function showToast(msg, ms = 1700) {
   const t = document.getElementById('toast');
   if (!t) return;
   t.textContent = msg;
   t.hidden = false;
   t.classList.remove('toast-show'); void t.offsetWidth; t.classList.add('toast-show');
   if (toastTimer) clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { t.classList.remove('toast-show'); t.hidden = true; }, 1700);
+  toastTimer = setTimeout(() => { t.classList.remove('toast-show'); t.hidden = true; }, ms);
 }
 
 let pendingClaimBanner = null;   // set by a claim/give-up so concludeHand shows it first
