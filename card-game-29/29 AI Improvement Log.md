@@ -1,10 +1,13 @@
 # 29 — AI Improvement Log
 
-> **STATUS: collecting feedback — do NOT change the AI engine yet.**
-> Games logged: **3** · Threshold before acting: **~7–8 games**.
-> Until then, leave `ai.js` untouched (`AI_TUNING`, `aiPlayCard`/`aiLead`/`aiFollowSuit`/`aiDiscard`,
-> `aiBidValue`/`aiBidValueAgainstHolder`). Accumulate hands, distill the recurring patterns under
-> **Candidate AI changes**, then make the changes + re-verify in one focused pass.
+> **STATUS: first tuning pass APPLIED (2026-06-05).** Candidates **#1, #2, #4, #5a, #6** and both
+> Non-AI follow-ups (move-log capture bug, reveal flash) are implemented + verified — see
+> **“Changes applied — 2026-06-05”** below. Games logged: **3** (+ chat analysis of hands 8/9).
+> The user explicitly chose to act now ("update the game AI… everything incl. bidding & reveal")
+> rather than wait for the ~7–8-game threshold; bidding (#4) shipped as conservative, band-scoped,
+> reversible dials behind a Node regression harness. **Still open:** #3 (No-Trump strategy) and #5b
+> (stop drawing trump once both opponents are void) — deferred, see the Changes section.
+> Resume collecting exports; the next pass can retighten `AI_TUNING` against the new behaviour.
 
 ## How this works
 - Each exported hand (`29-feedback-hand-N.json`, from the in-game **⬇ Export** button) gets a dated
@@ -101,6 +104,60 @@
    - *Candidate:* re-examine the reveal threshold (allow strong non-J/9 ruffers? factor "am I likely
      just waking the declarer's trumps?"). **Important framing fix:** never evaluate a reveal as if the
      player already knows the trump — it doesn't until it reveals.
+
+## Changes applied — 2026-06-05
+
+First tuning pass. All play-logic changes are **additive and backward-compatible**: `aiPlayCard` /
+`aiLead` / `aiFollowSuit` gained an optional trailing `seen` arg (`{ played:Set<cardKey>, toActAfter,
+declarerTrump }`, built in `game.js` `doAIPlay`); when it's omitted (`seen = null`) every new branch is
+skipped and behaviour is byte-identical to before — the regression harness asserts both paths.
+
+**Enabling change (E1).** `doAIPlay` (game.js) now builds `seen` and passes it through. The AI still
+receives `effectiveTrump()` (null while concealed) as the *active* trump — the concealed declarer's own
+trump rides separately in `seen.declarerTrump`, so the AI never treats inert trump as live. New pure
+helper `isBoss(card, myHand, seen)` (every higher-ranked card of the suit is played or in hand).
+
+- ✅ **#1 — cash established winners (`aiLead`).** Between the Jack rule and the low-card fallback, a
+  `seen`-gated **boss branch**: if we hold the top unplayed card of a non-avoid suit, run the longest
+  such suit and lead its highest boss.
+- ✅ **#2 — bank winners / secure a beatable partner (`aiFollowSuit`).** (i) When a partner is winning
+  but its card isn't the boss, an opponent is still to act, and we hold a master → secure with the
+  cheapest master (gated to **concealed/No-Trump** so we don't expose a master to a live ruff).
+  (ii) When sure to win a non-trump suit (last to act, or our winner is the led-suit boss) and we hold
+  several winners → bank the **highest-POINT** one (`highestPointCard`) instead of the cheapest.
+- ✅ **#4 — bidding valuation dials (`aiBidValue` / `AI_TUNING.bid`).** Band structure + hard-cap 22
+  intact. (a) `strong3`: a 3-card suit headed by a J/9 **plus an A or K** now reaches the mid band
+  instead of being dumped to `weakCeiling` (addresses the hand-9 under-bid). (b) `marriageBonus +1`
+  when the trump candidate holds K+Q. (c) `shapeStackPtsMin`: on thin hands (<8 pts) the
+  (5-suit + honours) shape stack is capped at +2 (curbs the Game-1 over-bid). No `_scoreLean` change.
+- ✅ **#5a — declarer stops leading its own concealed trump (`aiLead`).** `avoidSuit = trumpSuit ||
+  seen.declarerTrump`, applied in the Jack filter, boss branch, and low-lead fallback. (The full C8
+  reveal/marriage logic was already correct.)
+- ✅ **#6 — reveal-to-ruff threshold (`aiShouldReveal`).** Keeps J/9-ruffer → reveal on a worth-it
+  (≥2-pt) trick; **adds**: a bare non-led **Ace** reveals on a richer (≥3-pt) trick. K/10 still excluded;
+  declarer path + the C8 "never reveal over a winning partner" short-circuit untouched.
+- ✅ **Non-AI: move-log capture bug (`feedback.js` / `game.js`).** `trickBuf` moved into the private
+  state block and **reset in `beginHand`** — the root cause of phantom plays (a claim/concede ends a
+  hand without `logTrickResolved`, so the in-flight buffer used to leak into the next hand's trick 1).
+  Plus a defensive `trickSize` guard in `logTrickResolved` (warn + truncate on a desync; `trickSize()`
+  passed from `resolveTrick`) and a `console.warn` if `revealTrump` is ever called without a revealer.
+- ✅ **Non-AI: reveal flash too brief (`game.js` / `style.css`).** Flash 1600→**2600 ms**, CSS reps
+  3→**5** (2.5 s), and the reveal toast holds **2700 ms** (`showToast` gained an optional duration).
+- ✅ **UI: declarer can Claim/Concede pre-reveal (`game.js`).** Chip visibility factored into
+  `refreshActionChips()` (self-gating on `phase===PLAYING && human turn && !resolving`) and re-asserted
+  after every transient overlay closes (reveal prompt, marriage, rejected claim) — the chips used to
+  stay hidden after a reveal prompt. `onClaim` already evaluated with the real `state.trumpSuit`.
+
+**Deferred (not in this pass):** **#3** (a dedicated No-Trump strategy in `aiPlayCard`/`aiLead`) and
+**#5b** (stop drawing trump once both opponents are void — needs void-tracking the AI can't legally have
+under concealment). Both remain in the Candidate list above.
+
+**Verification.** New committed harness `card-game-29/test-ai.js` (zero-dep; eval-loads cards.js + ai.js)
+— **35/35 green**, asserting each heuristic *and* its legacy (`seen=null`) path. Preview-driven hands
+(no-cache serve): clean load, **0 console errors** across 3 hands; a played-out hand's move-log sums to
+**29** with every trick = 4 plays; a hand following an AI claim has **no phantom** in trick 1 (4 plays);
+Claim/Concede chips **visible on South's pre-reveal turn** (and hidden during the resolve pause / on AI
+turns). Cache-busters bumped: `ai.js v11`, `game.js v15`, `feedback.js v13`, `style.css v15`.
 
 ## Game log
 

@@ -802,6 +802,7 @@ function revealTrump(byWhom) {
   if (state.isNoTrump || state.trumpRevealed) return;
   state.trumpRevealed = true;
   // Move-log capture (AI-feedback): who revealed, at which (in-progress) trick.
+  if (byWhom == null) console.warn('[feedback] revealTrump called without a revealer — crediting the declarer');
   feedbackLog.logReveal({ atTrick: state.tricks.length + 1, by: byWhom == null ? state.declarer : byWhom, suit: state.trumpSuit });
   renderTrumpIndicator();
   setStatus(`🔔 TRUMP REVEALED — ${SUIT_SYMBOL[state.trumpSuit]} ${state.trumpSuit.toUpperCase()}!`);
@@ -832,6 +833,7 @@ function resolveTrick() {
   feedbackLog.logTrickResolved({
     trickNumber: state.trickCount, winner, cardPoints: pts,
     isLastTrick: !state.isSingleHand && state.trickCount === 8,
+    trickSize: trickSize(),    // 4 normally, 3 in a Single Hand — lets feedback.js catch a buffer desync
   });
   state.currentTrick = [];
   state.activePlayer = winner;

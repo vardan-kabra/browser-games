@@ -66,6 +66,7 @@ const feedbackLog = (() => {
       deal: dealOut, trumpReveal: null, tricks: [], runningPoints: [], result: null,
     };
     pendingEvents = [];
+    trickBuf = { leader: null, plays: [] };   // drop any plays left buffered by a claim/concede end
     running = { we: 0, they: 0 };
     endNote = null;
     loadFlags();
@@ -110,8 +111,9 @@ const feedbackLog = (() => {
     if (hand.tricks.length) hand.tricks[hand.tricks.length - 1].events.push({ type: 'marriage', by: SEAT_CODE[by], adjust: adj });
   }
 
-  // buffer of plays for the in-progress trick
-  let trickBuf = { leader: null, plays: [] };
+  // (trickBuf is declared in the private-state block above so beginHand() can reset it — a hand
+  //  that ends via claim/concede never calls logTrickResolved, so its last in-flight plays would
+  //  otherwise leak into the next hand's trick 1.)
   function logPlay({ leader, seat, card: c, ledSuit, isTrump, inertTrump }) {
     if (!hand) return;
     if (trickBuf.plays.length === 0) trickBuf.leader = SEAT_CODE[leader];
@@ -121,8 +123,14 @@ const feedbackLog = (() => {
     });
   }
 
-  function logTrickResolved({ trickNumber, winner, cardPoints, isLastTrick }) {
+  function logTrickResolved({ trickNumber, winner, cardPoints, isLastTrick, trickSize }) {
     if (!hand) return;
+    // Defensive: a resolved trick must hold exactly trickSize plays (4, or 3 in a Single Hand).
+    // If a stray/duplicate play slipped into the buffer, warn and keep only the last trickSize.
+    if (trickSize && trickBuf.plays.length !== trickSize) {
+      console.warn(`[feedback] trick ${trickNumber}: expected ${trickSize} plays, got ${trickBuf.plays.length}`);
+      trickBuf.plays = trickBuf.plays.slice(-trickSize);
+    }
     const plays = trickBuf.plays;
     const wc = SEAT_CODE[winner];
     plays.forEach(p => { if (p.seat === wc) p.winning = true; });
