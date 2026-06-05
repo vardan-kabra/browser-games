@@ -19,8 +19,8 @@
           {
             "type": "command",
             "shell": "bash",
-            "command": "git add -A && (git diff --cached --quiet || git commit -q -m \"Auto-commit on session end: $(date '+%Y-%m-%d %H:%M:%S')\") && git push -q origin main || true",
-            "statusMessage": "Auto-committing and pushing to GitHub...",
+            "command": "if git ls-files -z -co --exclude-standard '*.js' '*.mjs' | xargs -0 -r -n1 node --check; then git add -A && (git diff --cached --quiet || git commit -q -m \"Auto-commit on session end: $(date '+%Y-%m-%d %H:%M:%S')\") && git push -q origin main || true; else echo \"[SessionEnd] JS syntax check FAILED — SKIPPING auto-commit/push (fix the file(s) above, then commit manually)\"; fi",
+            "statusMessage": "Syntax-checking JS, then auto-committing to GitHub...",
             "timeout": 60
           }
         ]
