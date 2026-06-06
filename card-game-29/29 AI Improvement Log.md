@@ -2,12 +2,22 @@
 
 > **STATUS: first tuning pass APPLIED (2026-06-05).** Candidates **#1, #2, #4, #5a, #6** and both
 > Non-AI follow-ups (move-log capture bug, reveal flash) are implemented + verified — see
-> **“Changes applied — 2026-06-05”** below. Games logged: **3** (+ chat analysis of hands 8/9).
+> **“Changes applied — 2026-06-05”** below. Games logged: **5** (+ chat analysis of hands 8/9).
 > The user explicitly chose to act now ("update the game AI… everything incl. bidding & reveal")
 > rather than wait for the ~7–8-game threshold; bidding (#4) shipped as conservative, band-scoped,
 > reversible dials behind a Node regression harness. **Still open:** #3 (No-Trump strategy) and #5b
 > (stop drawing trump once both opponents are void) — deferred, see the Changes section.
 > Resume collecting exports; the next pass can retighten `AI_TUNING` against the new behaviour.
+>
+> **POST-PASS (2026-06-05): Games 4–5 logged** (match `m-1780656179625`, hands 2–3) — **played on the
+> NEW build** (confirmed: the #6 bare-Ace reveal fired at G4 trick 6, a new-build-only branch). They
+> expose **two residual gaps the first pass did NOT cover**, now the priority for a 2nd pass: **(a) bank
+> points under a *securely*-winning partner** — #2(i)/(ii) handle overtaking a *beatable* partner and
+> banking when *you* win, but NOT "partner safely wins → throw my highest-POINT card" (G5 f1/f2); **(b)
+> reveal-to-ruff on a *developing* trick / from the declaring side** — `aiShouldReveal`'s `worthIt` counts
+> only points already on the table, so the declarer's partner ducked a 5-point ruff (G4 f2). The
+> **card-tracking infra itself (`seen`/`isBoss`) is confirmed live and correct** — these are decision
+> heuristics that don't yet *consume* it.
 
 ## How this works
 - Each exported hand (`29-feedback-hand-N.json`, from the in-game **⬇ Export** button) gets a dated
@@ -48,6 +58,16 @@
      with a **high-point** card (J/9) if it's at risk of being ruffed/stranded, not the cheapest winner.
      Unifying rule: **bank the points of high cards you can't safely keep.** (Still be careful —
      overtaking a *safe* partner winner is usually wrong.)
+   - ⚠ **Residual gap after the first pass — sub-case (iii), the priority next play fix (G5 f1/f2, hand 3
+     of `m-…625`).** The shipped #2 covers (i) overtake a *beatable* partner and (ii) bank when *you* win
+     — but NOT the case where the partner is **securely** winning (you're last to act, or its card is
+     unbeatable by what's left) and you must follow: the branch still dumps `lowestCard`. It should **bank
+     your highest-POINT non-boss card** (give the points to the partner's sure trick). *Evidence:* North,
+     last to act under partner South's winning ♦9 ruff, held ♣Q(0)/♣10(1)/**♣9(2)** and dumped ♣Q — should
+     have thrown ♣9 (**+2**), which also frees the 0-point ♣Q to discard at trick 5 instead of leaking ♣10.
+     Use `isBoss` so you don't bank a high card you can still cash yourself; the user's own reasoning is
+     pure card-tracking ("the ♣J is still out → my ♣9 won't win later → cash its points now"). *(Minor
+     sibling: `safeDiscard` breaks ties by lowest **rank**, not lowest **point** — a 0/1-pt refinement.)*
 
 ### No-Trump play (root cause of the play flags)
 3. The play logic is **trump-centric**; there is **no No-Trump-specific strategy** (establish + cash
@@ -104,6 +124,18 @@
    - *Candidate:* re-examine the reveal threshold (allow strong non-J/9 ruffers? factor "am I likely
      just waking the declarer's trumps?"). **Important framing fix:** never evaluate a reveal as if the
      player already knows the trump — it doesn't until it reveals.
+   - ⚠ **Residual gap after the first pass (G4 f2, hand 2 of `m-…625`).** The shipped #6 (allow a bare
+     non-led **Ace** ruffer on a ≥3-pt trick) didn't help where it mattered: `worthIt` is computed on
+     **points already on the table**, so the declarer's PARTNER (North) — void in spades with a spare ♣7
+     trump + two outside 9s — **ducked a developing 5-point trick** (only ♠Q=0 was down at its turn) and
+     let West win with ♠J. Two refinements: **(a)** the **declaring side** (declarer *or* partner) should
+     reveal-to-ruff an opponent-winning trick far more readily — it's their *own* trump and it can **enable
+     the partner's marriage** (here S held the ♣ marriage); **(b)** `worthIt` should weigh the trick's
+     *potential* (seats still to act), not just the current pot. *Counter-observation (same hand, t6):* the
+     new bare-Ace branch fired for **West** holding **no trump** (its Ace was hearts, trump clubs) — a
+     wasted reveal that *enabled* South's marriage, so the **defender** bare-Ace gamble may want a touch
+     more caution even as the declaring-side floor rises. Map: `aiShouldReveal` + the `!ledIsTrump` AI-reveal
+     gate in `doAIPlay` (that gate is *correct* and explains G4 f1 — see the game entry).
 
 ## Changes applied — 2026-06-05
 
@@ -276,6 +308,69 @@ misplayed a strong hand into a rout.
 form — two un-banked jacks (♥J, ♣J) directly lost the hand (6/18, −1). Plus a bidding-valuation data
 point (under-rating short-strong suits, #4) and a UI request (trump-reveal flash too brief).
 
+### Game 4 — match `m-1780656179625` · hand 2 · 2026-06-05  *(post-pass; NEW build)*
+**Contract:** South bid **21, trump ♣** (revealed trick 6 by W). **Result: MADE** — N–S took **23** of 17
+needed, **+2** (match We 4 / They 0). Marriage S −4 at trick 6.
+
+**Bidding recap:** N 16 → W pass → **S 21** → N pass → E pass.
+**Tricks** (♣ = concealed trump until trick 6; winner in **bold**):
+1. **N♣J** W♥7 S♣8 E♣10 → N +4
+2. **N♣9** W♠8 S♣A E♠7 → N +3  *(♣9 beats ♣A — rank 9 > A)*
+3. N♦7 W♦8 S♦K **E♦10** → E +1
+4. E♠Q N♣7 **W♠J** S♠9 → W +5  *(N void in spades, holds ♣7 trump + ♥9/♦9 — DID NOT reveal-and-ruff)*
+5. W♥8 **S♥J** E♥10 N♥K → S +4
+6. **S♦J** E♦A N♦Q W♥Q → S +4  *(W reveals ♣ on a bare-Ace gamble but holds no clubs → just discards ♥Q; this ENABLED S's marriage)*
+7. **S♣K** E♠10 N♥9 W♠K → S +3
+8. **S♣Q** E♠A N♦9 W♥A → S +5 (last trick +1)
+
+**Flags:**
+- **f1 (trick 1 — "AI, why not ruff and reveal?"):** *Weak / by-design.* N led the trump suit itself
+  (♣J; clubs = trump). The only void-in-clubs seat was **West**, and being void in the led suit *which is
+  the trump* means West holds **no trump to ruff with** — `doAIPlay`'s `!ledIsTrump` guard correctly
+  declines (revealing gains nothing and only wakes trump for the N–S declaring side). The user couldn't
+  see West's hand (no clubs). Not a bug → `doAIPlay` `ledIsTrump` gate (correct).
+- **f2 (trick 4 — North didn't reveal to ruff):** *Valid → Candidate #6 refinement.* North (declarer's
+  PARTNER), void in spades, held a spare **♣7** plus two outside 9s; revealing to ruff wins the whole trick
+  (♠Q + West's ♠J + South's ♠9 = **5 points**, and neither opponent could over-ruff). `aiShouldReveal`
+  declined because `worthIt` saw only ♠Q (0 pts) on the table at North's turn, ignoring the cards yet to
+  fall and that **North is on the declaring side** (own trump; would also enable South's ♣ marriage).
+  Costliest decision of the hand (a 5-point swing the contract happened to survive) → `aiShouldReveal`.
+
+**Net for Game 4:** the **reveal heuristic is still too conservative** — even post-#6 the declaring side
+won't reveal-to-ruff a developing trick (#6 refinement). f1 is a clean by-design (led=trump guard).
+Side-note: the new bare-Ace reveal misfired for West at t6 (no trump) and helped the opponents' marriage.
+
+### Game 5 — match `m-1780656179625` · hand 3 · 2026-06-05  *(post-pass; NEW build)*
+**Contract:** **West (AI)** bid **17, trump ♦** (revealed trick 2 by N). **Result: FAILED** — W–E took
+**9** of 15 needed, **−1** (match We 4 / They −1). Marriage W −4 at trick 3. South is on defence (N–S).
+
+**Bidding recap:** W 16 → S pass → E pass → N 17 → W 17 → N pass.
+**Tricks** (♦ = concealed trump until trick 2; winner in **bold**):
+1. W♥7 **S♥J** E♥K N♦7 → S +3
+2. S♥A E♥9 **N♦10** (ruff, reveals ♦) W♥8 → N +4  *(good AI reveal: E's ♥9 was beating partner S's ♥A, so North ruffs to win)*
+3. N♠Q **W♠K** S♠7 E♠8 → W +0  *(W declares marriage −4)*
+4. W♣8 **S♦9** (ruff) E♣7 N♣Q → S +2  *(North, last to act under partner's winning ruff, dumped ♣Q — should have banked ♣9)*
+5. S♥10 E♣K N♣10 **W♦8** (ruff) → W +2  *(North's ♣10 leaks — downstream of t4)*
+6. W♠10 S♠9 **E♠J** N♠A → E +7
+7. E♣J N♣9 W♦Q **S♦A** (ruff) → S +6  *(North's kept ♣9 just follows here and wins nothing — ♣J was the boss, as the user said)*
+8. S♥Q E♣A **N♦J** W♦K → N +5 (last trick +1)  *(North's ♦J trump boss finally wins — hand was under control)*
+
+**Flags:**
+- **f1 (trick 4 — North should bank ♣9, not ♣Q):** *Strong, valid → Candidate #2, new sub-case (iii).*
+  Partner South was **securely** winning (ruffed ♦9; North last to act). North must follow clubs and held
+  ♣Q(0)/♣10(1)/**♣9(2)** — banking ♣9 gives the team **+2** it instead left behind (took 2, could've been
+  4). The user's reasoning is explicit card-tracking: the **♣J is still out**, so North's ♣9 will not win
+  on its own later → cash its points now into the partner's sure trick. #2(i)/(ii) don't cover a *safely*-
+  winning partner; the branch dumped `lowestCard` = ♣Q → `aiFollowSuit` partner-winning branch.
+- **f2 (trick 5 — the leak):** *Valid; downstream of f1.* Because North kept ♣9/♣10 (dumped ♣Q at t4), at
+  t5 it had to discard a *point* card (♣10, −1) under West's ruff. Banking ♣9 at t4 would let it shed the
+  0-point ♣Q here and leak nothing. Same fix. (Minor: `safeDiscard` had no zero-point card and chose by
+  lowest **rank**, not lowest **point**.)
+
+**Net for Game 5:** the **bank-to-a-winning-partner** gap (#2 sub-case iii) in its cleanest, card-tracking-
+driven form — precisely the capability the user is asking about. The `seen`/`isBoss` foundation is present;
+the follow-suit branch just doesn't consult it when the partner is already winning.
+
 ## Non-AI follow-ups
 - **Move-log capture bug (surfaced by the hand-8 export).** Trick 1 carries two **phantom plays** —
   `S ♥8` and `E ♦A`, cards not in those seats' deals (the real trick is the four spades
@@ -283,6 +378,13 @@ point (under-rating short-strong suits, #4) and a UI request (trump-reveal flash
   ruffed/won with ♣A, and that ♣A is still flagged `inertTrump`. Likely in `feedback.js`
   `logPlay`/`trickBuf` (stale/duplicated plays) and/or `revealTrump(byWhom)` attribution. **Fix and add
   a guard** — each trick should log exactly `trickSize` plays, each a card the seat actually holds.
-- **Trump-reveal flash too brief (UI).** When an AI reveals the trump, the on-screen indication
-  doesn't stay long enough to read (hand 9 / f3). Lengthen the reveal flash/toast by ~1 s so the
-  player can register what happened.
+- **Trump-reveal flash too brief (UI).** ✅ *Done in the first pass* (flash 2.6 s / 5 reps, toast 2.7 s).
+  When an AI reveals the trump, the on-screen indication doesn't stay long enough to read (hand 9 / f3).
+- **Show the trump reveal inside the post-hand Review (UI request, G4/G5 f-side note).** The 🔁
+  play-by-play review steps Bidding → tricks but never surfaces **when/what** trump was revealed. Add a
+  reveal indication at the trick where it happened: flip the trump indicator face-up (the 3-of-suit) at
+  `trumpReveal.atTrick`, keep it **face-down on earlier steps**, and show a small "Trump revealed: ♣ (by W)"
+  marker — mirroring the in-game reveal (`renderTrumpIndicator` face-down→face-up, optionally the same
+  flash). The review already reads core `state.tricks` / `state.dealtHands`; the reveal trick + suit live
+  in `state` (and `feedbackLog.trumpReveal`). Payoff: the replay becomes honest about *when* trump woke up
+  — why a given ruff worked, or why a trump card sat inert earlier. Self-contained, low-risk UI work.
