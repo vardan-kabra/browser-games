@@ -134,8 +134,16 @@
      *potential* (seats still to act), not just the current pot. *Counter-observation (same hand, t6):* the
      new bare-Ace branch fired for **West** holding **no trump** (its Ace was hearts, trump clubs) — a
      wasted reveal that *enabled* South's marriage, so the **defender** bare-Ace gamble may want a touch
-     more caution even as the declaring-side floor rises. Map: `aiShouldReveal` + the `!ledIsTrump` AI-reveal
-     gate in `doAIPlay` (that gate is *correct* and explains G4 f1 — see the game entry).
+     more caution even as the declaring-side floor rises. Map: `aiShouldReveal`.
+   - ⚠ **God-mode reveal gate (G4 f1) — a *separate* fix from the threshold.** `doAIPlay` (game.js:667)
+     gates the AI reveal on `ledIsTrump = ledSuit === state.trumpSuit` — the **real** trump — for **every**
+     seat. A non-declarer can't know the trump, so this lets the AI "skip a pointless reveal" by *peeking*,
+     inconsistent with the discovery model (and with the human, who via `revealApplicable` IS offered the
+     reveal even when led=trump — deliberately, so its absence can't leak the trump). **Fix: remove the
+     `!ledIsTrump` gate** and let `aiShouldReveal` decide purely from the AI's own hand. Consequence: the AI
+     will sometimes reveal and find the led suit *was* trump (void in trump → discard) — a wasted reveal,
+     but the *fair* one. (`knownTrump` itself is fine — `null` for non-declarers.) Pairs with the
+     defender-caution refinement above, so a defender doesn't wake the declarer's trump cheaply.
 
 ## Changes applied — 2026-06-05
 
@@ -324,11 +332,19 @@ needed, **+2** (match We 4 / They 0). Marriage S −4 at trick 6.
 8. **S♣Q** E♠A N♦9 W♥A → S +5 (last trick +1)
 
 **Flags:**
-- **f1 (trick 1 — "AI, why not ruff and reveal?"):** *Weak / by-design.* N led the trump suit itself
-  (♣J; clubs = trump). The only void-in-clubs seat was **West**, and being void in the led suit *which is
-  the trump* means West holds **no trump to ruff with** — `doAIPlay`'s `!ledIsTrump` guard correctly
-  declines (revealing gains nothing and only wakes trump for the N–S declaring side). The user couldn't
-  see West's hand (no clubs). Not a bug → `doAIPlay` `ledIsTrump` gate (correct).
+- **f1 (trick 1 — "AI, why not ruff and reveal?"):** *RECLASSIFIED → valid: the decline came from a
+  GOD-MODE reveal gate (a real inconsistency).* West was the only void-in-clubs seat. The *outcome*
+  (declining) is fine, but the *mechanism* is wrong: `doAIPlay` (game.js:667) computes
+  `ledIsTrump = ledSuit === state.trumpSuit` from the **real** trump and uses it (`!ledIsTrump`) to
+  suppress the reveal for **all** seats — including a non-declarer like West, which **cannot legally know
+  the trump**. In a faithful model West evaluates the reveal as a discovery gamble on its own hand, and
+  `aiShouldReveal` would in fact return **true** here (West holds ♠J + the trick is worth ♣J=3 →
+  `honoursNonLed≥1 && worthIt`): West reveals and — trump being clubs — discovers it's void in trump and
+  discards (a *wasted* reveal, the fair cost of the gamble, exactly what the human's `revealApplicable`
+  already allows by NOT hiding the option when led=trump). The `knownTrump` plumbing (game.js:655) is
+  correct (non-declarers get `null`; `aiShouldReveal` reads it only on the declarer branch); the
+  `!ledIsTrump` gate is the *separate* leak. → **Candidate #6: drop the god-mode `!ledIsTrump` gate — a
+  non-declarer's reveal must be hand-only.**
 - **f2 (trick 4 — North didn't reveal to ruff):** *Valid → Candidate #6 refinement.* North (declarer's
   PARTNER), void in spades, held a spare **♣7** plus two outside 9s; revealing to ruff wins the whole trick
   (♠Q + West's ♠J + South's ♠9 = **5 points**, and neither opponent could over-ruff). `aiShouldReveal`
@@ -336,9 +352,11 @@ needed, **+2** (match We 4 / They 0). Marriage S −4 at trick 6.
   fall and that **North is on the declaring side** (own trump; would also enable South's ♣ marriage).
   Costliest decision of the hand (a 5-point swing the contract happened to survive) → `aiShouldReveal`.
 
-**Net for Game 4:** the **reveal heuristic is still too conservative** — even post-#6 the declaring side
-won't reveal-to-ruff a developing trick (#6 refinement). f1 is a clean by-design (led=trump guard).
-Side-note: the new bare-Ace reveal misfired for West at t6 (no trump) and helped the opponents' marriage.
+**Net for Game 4:** two reveal findings. **(1) f1 exposes a GOD-MODE reveal gate** — `doAIPlay`'s
+`!ledIsTrump` suppresses a non-declarer's reveal using the *real* trump, which it can't know; drop it so the
+AI gambles like the human (Candidate #6). **(2) the reveal heuristic is still too conservative** — even
+post-#6 the declaring side won't reveal-to-ruff a developing trick (f2, #6 refinement). Side-note: the new
+bare-Ace reveal misfired for West at t6 (no trump) and helped the opponents' marriage.
 
 ### Game 5 — match `m-1780656179625` · hand 3 · 2026-06-05  *(post-pass; NEW build)*
 **Contract:** **West (AI)** bid **17, trump ♦** (revealed trick 2 by N). **Result: FAILED** — W–E took
