@@ -224,18 +224,31 @@ function aiShouldReveal(seat, hand, trick, declarer, knownTrump) {
     // Bidder knows the trump suit and whether they hold it.
     return worthIt && hand.some(c => c.suit === knownTrump);
   }
-  // Non-bidder: gamble. With 7 unseen suits (excluding led), trump is one of 3 candidates;
-  // estimate p(hand contains trump in some non-led suit) by counting how many of the AI's
-  // own non-led suits are present (longer holdings → more likely to include trump).
+  // Non-bidder: a DISCOVERY gamble decided ONLY from our own hand — we never read the real trump
+  // (only the bidder knows it). The proxy for "do I likely hold a trump to ruff with?" is a high card
+  // in some non-led suit (the trump turns out to be one of those suits often enough to gamble on).
+  // NOTE: the old `!ledIsTrump` god-mode gate in doAIPlay was removed — if the led suit happens to BE
+  // the trump, the AI reveals, finds itself void in trump, and discards (the fair cost of the gamble).
   const nonLed = hand.filter(c => c.suit !== ledSuit);
-  if (!nonLed.length) return false;                            // nothing to ruff with
+  if (!nonLed.length) return false;                            // nothing to ruff with in any suit
   const honoursNonLed = nonLed.filter(c => c.rank === 'J' || c.rank === '9').length;
-  // A J/9 across non-led suits is a strong ruffer → reveal if the trick is worth it (≥2).
+  const aceNonLed     = nonLed.some(c => c.rank === 'A');
+  if (!honoursNonLed && !aceNonLed) return false;              // no plausible ruffer → don't gamble
+
+  // Whose trump do we wake? On the BIDDER'S SIDE (declarer or its partner) the revealed trump is our
+  // own — cheap, and it can enable our partner's marriage — so we reveal to ruff an opponent's trick
+  // readily, counting a still-DEVELOPING trick (seats yet to act will add cards/points) as worth it.
+  // A DEFENDER wakes the bidder's trump for everyone (costly), so it keeps the conservative bars.
+  const declaringSide = declarer != null && _samePartnership(seat, declarer);
+  const developing    = trick.length < 3;                      // 4-player trick; reveal never fires in Single Hand
+
+  if (declaringSide) {
+    if (honoursNonLed >= 1) return worthIt || developing;      // strong ruffer: worth-it OR still-growing
+    return worthIt;                                            // bare Ace: only a worth-it trick
+  }
+  // Defender (unchanged from the shipped #6 thresholds): J/9 → worth-it; bare Ace → a richer ≥3-pt trick.
   if (honoursNonLed >= 1) return worthIt;
-  // A bare Ace can also win a ruff, but revealing wakes trump for everyone (it usually helps
-  // a strong-trump declarer), so only gamble it on a richer trick (≥3 points). K/10 too weak.
-  if (nonLed.some(c => c.rank === 'A')) return trickPts >= 3;
-  return false;
+  return trickPts >= 3;
 }
 
 // ── AI: Card play ─────────────────────────────────────────────────────────────

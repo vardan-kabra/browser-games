@@ -199,6 +199,34 @@ under concealment). Both remain in the Candidate list above.
 Claim/Concede chips **visible on South's pre-reveal turn** (and hidden during the resolve pause / on AI
 turns). Cache-busters bumped: `ai.js v11`, `game.js v15`, `feedback.js v13`, `style.css v15`.
 
+## Changes applied — 2026-06-06 (reveal pass)
+
+Second tuning pass — the reveal work from Candidate #6. **Defender and declarer behaviour are
+unchanged**; the two edits affect only (a) whether a non-declarer's reveal is gated by god-mode, and
+(b) how readily the bidder's *side* reveals.
+
+- ✅ **Dropped the god-mode reveal gate (`game.js` `doAIPlay`).** Removed `const ledIsTrump = ledSuit ===
+  state.trumpSuit` and the `!ledIsTrump` term from the AI-reveal condition. A non-declarer no longer
+  "peeks" at the real trump to skip a reveal — it evaluates the reveal as a pure discovery gamble from its
+  own hand (`aiShouldReveal`). If the led suit turns out to BE the trump, it reveals, finds itself void in
+  trump, and discards (`mustRuffWithTrump` stays false) — the fair cost the human already takes via
+  `revealApplicable`.
+- ✅ **Declaring-side reveal readiness (`ai.js` `aiShouldReveal`).** The non-declarer gamble stays
+  hand-only (never reads the trump). Added: on the **bidder's side** (declarer or partner) a J/9 ruffer
+  reveals on a worth-it **OR still-developing** trick (`developing = trick.length < 3`) — fixing G4 f2
+  (North ducked a 5-point ruff because only ♠Q=0 was on the table at its turn). A **defender** keeps the
+  shipped thresholds (J/9 → ≥2 pts; bare Ace → ≥3 pts), since a defender wakes the *declarer's* trump.
+- **Verification.** `node card-game-29/test-ai.js` → **41/41** (6 new declaring-side-vs-defender cases;
+  every prior defender / declarer / `seen=null` case still green). Both edited files `node --check` clean.
+  Live preview (no-cache): fresh boot **0 console errors**, `ai.js?v=12` / `game.js?v=16` loaded, the
+  `ledIsTrump` reference gone from the running `doAIPlay`, and the page's own `aiShouldReveal` returns the
+  corrected verdicts on the real G4-t4 position (declaring-side developing → reveal; defender same trick →
+  hold; declaring-side last-to-act 0-pt → hold). Cache-busters: `ai.js v11→v12`, `game.js v15→v16`.
+
+**Still open in the reveal area (left for more data):** a *defender*-caution dial (the G4-t6 bare-Ace
+misfire) — kept at the shipped threshold to avoid over-tightening without self-play data. Separately still
+queued: **Candidate #2 sub-case (iii)** bank-to-a-winning-partner, and the **Review trump-reveal display**.
+
 ## Game log
 
 ### Game 1 — match `m-1780499431173` · 2026-06-03

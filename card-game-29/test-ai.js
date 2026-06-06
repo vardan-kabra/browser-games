@@ -190,6 +190,22 @@ section('#6 reveal-to-ruff thresholds');
   // declarer path (knows the trump suit + whether they hold it)
   checkTrue('declarer holds trump, worth it → reveal',      aiShouldReveal(0, [C('A','s'),C('8','d')], trick2, 0, 'spades'));
   checkTrue('declarer void in trump → hold',               !aiShouldReveal(0, [C('A','d'),C('8','d')], trick2, 0, 'spades'));
+
+  // declaring SIDE (bidder's partner: seat 2, declarer 0 → same team) reveals more readily than a
+  // DEFENDER (seat 2, declarer 1) — it counts a still-developing trick as worth a ruff. This is the
+  // hand-2-trick-4 fix: void in the led suit, holding outside 9s, on a 0-point but growing trick.
+  const partnerJ9  = [C('9','h'), C('9','d'), C('K','h'), C('7','c')];                 // void spades; ♥9/♦9 ruffers
+  const devTrick   = [play(1, C('Q','s'))];                                            // 0 pts, opp winning, still developing
+  const lastTrick0 = [play(1, C('Q','s')), play(0, C('8','s')), play(3, C('7','s'))];  // 0 pts, we're last to act
+  const lastTrick2 = [play(1, C('9','s')), play(0, C('8','s')), play(3, C('7','s'))];  // 2 pts, we're last to act
+  checkTrue('declaring side, developing 0-pt trick, J/9 ruffer → reveal',  aiShouldReveal(2, partnerJ9, devTrick,   0, null));
+  checkTrue('DEFENDER, same developing 0-pt trick → hold (contrast)',     !aiShouldReveal(2, partnerJ9, devTrick,   1, null));
+  checkTrue('declaring side, last-to-act 0-pt trick → hold',             !aiShouldReveal(2, partnerJ9, lastTrick0, 0, null));
+  checkTrue('declaring side, last-to-act 2-pt trick → reveal',            aiShouldReveal(2, partnerJ9, lastTrick2, 0, null));
+  // a bare Ace gets no developing bonus, even on the declaring side (weaker ruffer than a J/9)
+  const partnerAce = [C('A','h'), C('8','d'), C('K','d'), C('7','c')];                 // void spades, bare ♥A, no J/9
+  checkTrue('declaring side, bare Ace, developing 0-pt → hold',           !aiShouldReveal(2, partnerAce, devTrick,            0, null));
+  checkTrue('declaring side, bare Ace, 2-pt trick → reveal',              aiShouldReveal(2, partnerAce, [play(1,C('9','s'))], 0, null));
 }
 
 // ══════════════════════════════════════════════════════════════════════════════════

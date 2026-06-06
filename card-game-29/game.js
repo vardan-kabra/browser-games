@@ -661,11 +661,12 @@ function doAIPlay() {
   let mustRuffWithTrump = false;
   if (!state.isNoTrump && ledSuit && !state.trumpRevealed && state.trumpSuit) {
     const canFollow  = state.hands[seat].some(c => c.suit === ledSuit);
-    // When led=trump the AI is void in trump too, so revealing can't ruff and only helps
-    // opponents — the AI declines (correct play; AI hands are hidden, so no info leak. The
-    // human, by contrast, is always offered the choice — see revealApplicable).
-    const ledIsTrump = ledSuit === state.trumpSuit;
-    if (!canFollow && !ledIsTrump &&
+    // Reveal-to-ruff is a DISCOVERY gamble: a non-bidder doesn't know the trump and decides purely
+    // from its own hand (aiShouldReveal). We deliberately do NOT peek at the real trump here — if the
+    // led suit turns out to BE the trump, the AI (void in led ⇒ void in trump) reveals, finds no trump,
+    // and just discards below (mustRuffWithTrump stays false). That wasted-reveal risk is the fair cost
+    // the human also takes — revealApplicable offers the human the choice even when led = trump.
+    if (!canFollow &&
         aiShouldReveal(seat, state.hands[seat], state.currentTrick, state.declarer, knownTrump)) {
       revealTrump(seat);
       mustRuffWithTrump = state.hands[seat].some(c => c.suit === state.trumpSuit);
