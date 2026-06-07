@@ -1,0 +1,26 @@
+{
+  "skill_name": "tune-29-ai",
+  "evals": [
+    {
+      "id": 0,
+      "name": "hand4-overtake-and-uibug",
+      "prompt": "Here's another 29 game's feedback export: C:\\Dev\\Browser Games\\browser-games\\.claude\\skills\\tune-29-ai\\evals\\inputs\\hand-diamonds.json — analyze the AI play and bidding and add it to the AI improvement log. No code changes yet, we're still collecting.",
+      "expected_output": "Analysis of hand 4 (S bid 21 diamonds, made 28/17 by claim). Should: correctly use 29 rank order (J>9>A>10>K>Q>8>7); identify f2 (East ducked clubQ keeping clubJ under partner West winning -> should overtake with clubJ to bank 3 pts; the clubJ was then swept by S's claim) and map it to aiFollowSuit; treat f1 (West underbid its 5-heart K-Q-marriage hand) as a bidding/aiBidValue point noting the valuation ignores K-Q marriage potential; route f3 (claim/concede unavailable around the marriage/reveal) to a Non-AI follow-ups / UI-bug section, not the AI candidates. Produce a log entry in the existing format + a chat summary. Must NOT edit ai.js.",
+      "files": [".claude/skills/tune-29-ai/evals/inputs/hand-diamonds.json"]
+    },
+    {
+      "id": 1,
+      "name": "hand3-hindsight-and-ownplay",
+      "prompt": "Go through this 29 feedback file and log it, and tell me which of the flags are actually AI mistakes vs not: C:\\Dev\\Browser Games\\browser-games\\.claude\\skills\\tune-29-ai\\evals\\inputs\\hand-clubs.json",
+      "expected_output": "Analysis of hand 3 (S bid 17 clubs, made 29/17). Should push back honestly: classify f2 (S kept diamond10 as it became boss after A/J fell) as the human's OWN good play, not an AI critique (reinforces the cash-established-winners candidate); classify f4/f5 (East discarded a club void in diamonds / forced to drop clubA) as defensible/by-design + full-knowledge hindsight (opponents don't know trump is clubs; aiShouldReveal correctly declines a ~1-pt reveal below its 2-pt bar); treat f1 (N won trick 1 with heart9 not heartJ) as a bank-the-jack-under-ruff-risk nuance on aiFollowSuit. Should NOT rubber-stamp every flag as an AI error. Log entry + summary; no ai.js edits.",
+      "files": [".claude/skills/tune-29-ai/evals/inputs/hand-clubs.json"]
+    },
+    {
+      "id": 2,
+      "name": "hand-nt-cash-winners",
+      "prompt": "C:\\Dev\\Browser Games\\browser-games\\.claude\\skills\\tune-29-ai\\evals\\inputs\\hand-nt.json  analyze the AI play in this hand and add it to the improvement log",
+      "expected_output": "Analysis of the No-Trump hand (S bid 23 NT, failed 20/23). Should: identify f4 (West led heart8 while holding the two top clubs club9+clubA) as a strong, valid cash-established-winners bug mapped to aiLead; judge f3 as a WEAK critique (West actually won with the lowest sufficient club, clubQ — not a blunder); correct the f1 bidding premise ('no K/Q') by noting that in 29 the honours are J/9, not K/Q, and that aiBidValue's length+J/9 stacking let a ~7-pt hand reach the 22 cap; note the root cause that the AI has no No-Trump strategy. Log entry + summary; no ai.js edits.",
+      "files": [".claude/skills/tune-29-ai/evals/inputs/hand-nt.json"]
+    }
+  ]
+}

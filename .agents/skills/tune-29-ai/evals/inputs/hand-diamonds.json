@@ -1,0 +1,632 @@
+{
+  "schemaVersion": 1,
+  "kind": "29-ai-feedback",
+  "readme": "This file is AI-play feedback for the 29 card game (one hand). For each entry in `flags`: (1) go to its `anchorTrick` and `subjectPlay`; (2) reconstruct the position at that point from `deal` plus the earlier entries in `tricks`; (3) work out the flagged player's legal options there; (4) evaluate their actual play against the rules and, where possible, the double-dummy best line; (5) judge whether the user's `note` is valid; (6) recommend the correct play and the change to the AI's decision logic that would produce it. Follow any `relatedTricks` links. Use the rulebook for terminology (ruff, void, marriage, Single Hand, trump reveal). Upload this together with the rulebook and AI spec. Card rank order high→low: J 9 A 10 K Q 8 7.",
+  "rankOrderHighToLow": [
+    "J",
+    "9",
+    "A",
+    "10",
+    "K",
+    "Q",
+    "8",
+    "7"
+  ],
+  "match": {
+    "id": "m-1780548206076-jgogt4",
+    "scoreBefore": {
+      "we": 2,
+      "they": 0
+    },
+    "scoreAfter": {
+      "we": 4,
+      "they": 0
+    }
+  },
+  "hand": {
+    "number": 4,
+    "dealer": "W",
+    "seatingOrderCCW": [
+      "S",
+      "E",
+      "N",
+      "W"
+    ],
+    "bidding": [
+      {
+        "seat": "S",
+        "action": "raise",
+        "value": 16
+      },
+      {
+        "seat": "E",
+        "action": "raise",
+        "value": 17
+      },
+      {
+        "seat": "S",
+        "action": "raise",
+        "value": 21
+      },
+      {
+        "seat": "E",
+        "action": "pass"
+      },
+      {
+        "seat": "N",
+        "action": "pass"
+      },
+      {
+        "seat": "W",
+        "action": "pass"
+      }
+    ],
+    "contract": {
+      "bidder": "S",
+      "declaredBid": 21,
+      "trump": "D",
+      "noTrump": false,
+      "singleHand": false,
+      "soloSeat": null,
+      "sittingOut": null,
+      "double": "none"
+    },
+    "marriage": {
+      "atTrick": 5,
+      "by": "S",
+      "adjust": -4
+    },
+    "targets": {
+      "biddingTeamNeed": 17,
+      "defenseNeed": 13
+    },
+    "deal": {
+      "S": [
+        {
+          "rank": "K",
+          "suit": "C"
+        },
+        {
+          "rank": "Q",
+          "suit": "D"
+        },
+        {
+          "rank": "K",
+          "suit": "D"
+        },
+        {
+          "rank": "9",
+          "suit": "D"
+        },
+        {
+          "rank": "8",
+          "suit": "C"
+        },
+        {
+          "rank": "7",
+          "suit": "D"
+        },
+        {
+          "rank": "Q",
+          "suit": "S"
+        },
+        {
+          "rank": "J",
+          "suit": "D"
+        }
+      ],
+      "E": [
+        {
+          "rank": "10",
+          "suit": "H"
+        },
+        {
+          "rank": "K",
+          "suit": "S"
+        },
+        {
+          "rank": "Q",
+          "suit": "C"
+        },
+        {
+          "rank": "J",
+          "suit": "C"
+        },
+        {
+          "rank": "J",
+          "suit": "H"
+        },
+        {
+          "rank": "A",
+          "suit": "D"
+        },
+        {
+          "rank": "10",
+          "suit": "D"
+        },
+        {
+          "rank": "9",
+          "suit": "S"
+        }
+      ],
+      "N": [
+        {
+          "rank": "J",
+          "suit": "S"
+        },
+        {
+          "rank": "7",
+          "suit": "S"
+        },
+        {
+          "rank": "8",
+          "suit": "D"
+        },
+        {
+          "rank": "7",
+          "suit": "C"
+        },
+        {
+          "rank": "9",
+          "suit": "C"
+        },
+        {
+          "rank": "A",
+          "suit": "H"
+        },
+        {
+          "rank": "A",
+          "suit": "S"
+        },
+        {
+          "rank": "A",
+          "suit": "C"
+        }
+      ],
+      "W": [
+        {
+          "rank": "Q",
+          "suit": "H"
+        },
+        {
+          "rank": "9",
+          "suit": "H"
+        },
+        {
+          "rank": "7",
+          "suit": "H"
+        },
+        {
+          "rank": "K",
+          "suit": "H"
+        },
+        {
+          "rank": "10",
+          "suit": "S"
+        },
+        {
+          "rank": "10",
+          "suit": "C"
+        },
+        {
+          "rank": "8",
+          "suit": "H"
+        },
+        {
+          "rank": "8",
+          "suit": "S"
+        }
+      ]
+    },
+    "trumpReveal": {
+      "atTrick": 6,
+      "by": "S",
+      "suit": "D"
+    },
+    "tricks": [
+      {
+        "number": 1,
+        "leader": "S",
+        "plays": [
+          {
+            "seat": "S",
+            "card": {
+              "rank": "J",
+              "suit": "D"
+            },
+            "ledSuit": true,
+            "isTrump": true,
+            "inertTrump": true,
+            "winning": true
+          },
+          {
+            "seat": "E",
+            "card": {
+              "rank": "10",
+              "suit": "D"
+            },
+            "ledSuit": true,
+            "isTrump": true,
+            "inertTrump": true,
+            "winning": false
+          },
+          {
+            "seat": "N",
+            "card": {
+              "rank": "8",
+              "suit": "D"
+            },
+            "ledSuit": true,
+            "isTrump": true,
+            "inertTrump": true,
+            "winning": false
+          },
+          {
+            "seat": "W",
+            "card": {
+              "rank": "7",
+              "suit": "H"
+            },
+            "ledSuit": false,
+            "isTrump": false,
+            "inertTrump": false,
+            "winning": false
+          }
+        ],
+        "winner": "S",
+        "points": 4,
+        "events": []
+      },
+      {
+        "number": 2,
+        "leader": "S",
+        "plays": [
+          {
+            "seat": "S",
+            "card": {
+              "rank": "9",
+              "suit": "D"
+            },
+            "ledSuit": true,
+            "isTrump": true,
+            "inertTrump": true,
+            "winning": true
+          },
+          {
+            "seat": "E",
+            "card": {
+              "rank": "A",
+              "suit": "D"
+            },
+            "ledSuit": true,
+            "isTrump": true,
+            "inertTrump": true,
+            "winning": false
+          },
+          {
+            "seat": "N",
+            "card": {
+              "rank": "7",
+              "suit": "S"
+            },
+            "ledSuit": false,
+            "isTrump": false,
+            "inertTrump": false,
+            "winning": false
+          },
+          {
+            "seat": "W",
+            "card": {
+              "rank": "8",
+              "suit": "H"
+            },
+            "ledSuit": false,
+            "isTrump": false,
+            "inertTrump": false,
+            "winning": false
+          }
+        ],
+        "winner": "S",
+        "points": 3,
+        "events": []
+      },
+      {
+        "number": 3,
+        "leader": "S",
+        "plays": [
+          {
+            "seat": "S",
+            "card": {
+              "rank": "Q",
+              "suit": "S"
+            },
+            "ledSuit": true,
+            "isTrump": false,
+            "inertTrump": false,
+            "winning": false
+          },
+          {
+            "seat": "E",
+            "card": {
+              "rank": "K",
+              "suit": "S"
+            },
+            "ledSuit": true,
+            "isTrump": false,
+            "inertTrump": false,
+            "winning": false
+          },
+          {
+            "seat": "N",
+            "card": {
+              "rank": "A",
+              "suit": "S"
+            },
+            "ledSuit": true,
+            "isTrump": false,
+            "inertTrump": false,
+            "winning": true
+          },
+          {
+            "seat": "W",
+            "card": {
+              "rank": "8",
+              "suit": "S"
+            },
+            "ledSuit": true,
+            "isTrump": false,
+            "inertTrump": false,
+            "winning": false
+          }
+        ],
+        "winner": "N",
+        "points": 1,
+        "events": []
+      },
+      {
+        "number": 4,
+        "leader": "N",
+        "plays": [
+          {
+            "seat": "N",
+            "card": {
+              "rank": "J",
+              "suit": "S"
+            },
+            "ledSuit": true,
+            "isTrump": false,
+            "inertTrump": false,
+            "winning": true
+          },
+          {
+            "seat": "W",
+            "card": {
+              "rank": "10",
+              "suit": "S"
+            },
+            "ledSuit": true,
+            "isTrump": false,
+            "inertTrump": false,
+            "winning": false
+          },
+          {
+            "seat": "S",
+            "card": {
+              "rank": "8",
+              "suit": "C"
+            },
+            "ledSuit": false,
+            "isTrump": false,
+            "inertTrump": false,
+            "winning": false
+          },
+          {
+            "seat": "E",
+            "card": {
+              "rank": "9",
+              "suit": "S"
+            },
+            "ledSuit": true,
+            "isTrump": false,
+            "inertTrump": false,
+            "winning": false
+          }
+        ],
+        "winner": "N",
+        "points": 6,
+        "events": []
+      },
+      {
+        "number": 5,
+        "leader": "N",
+        "plays": [
+          {
+            "seat": "N",
+            "card": {
+              "rank": "7",
+              "suit": "C"
+            },
+            "ledSuit": true,
+            "isTrump": false,
+            "inertTrump": false,
+            "winning": false
+          },
+          {
+            "seat": "W",
+            "card": {
+              "rank": "10",
+              "suit": "C"
+            },
+            "ledSuit": true,
+            "isTrump": false,
+            "inertTrump": false,
+            "winning": true
+          },
+          {
+            "seat": "S",
+            "card": {
+              "rank": "K",
+              "suit": "C"
+            },
+            "ledSuit": true,
+            "isTrump": false,
+            "inertTrump": false,
+            "winning": false
+          },
+          {
+            "seat": "E",
+            "card": {
+              "rank": "Q",
+              "suit": "C"
+            },
+            "ledSuit": true,
+            "isTrump": false,
+            "inertTrump": false,
+            "winning": false
+          }
+        ],
+        "winner": "W",
+        "points": 1,
+        "events": [
+          {
+            "type": "marriage",
+            "by": "S",
+            "adjust": -4
+          }
+        ]
+      },
+      {
+        "number": 6,
+        "leader": "W",
+        "plays": [
+          {
+            "seat": "W",
+            "card": {
+              "rank": "Q",
+              "suit": "H"
+            },
+            "ledSuit": true,
+            "isTrump": false,
+            "inertTrump": false,
+            "winning": false
+          },
+          {
+            "seat": "S",
+            "card": {
+              "rank": "7",
+              "suit": "D"
+            },
+            "ledSuit": false,
+            "isTrump": true,
+            "inertTrump": false,
+            "winning": true
+          },
+          {
+            "seat": "E",
+            "card": {
+              "rank": "10",
+              "suit": "H"
+            },
+            "ledSuit": true,
+            "isTrump": false,
+            "inertTrump": false,
+            "winning": false
+          },
+          {
+            "seat": "N",
+            "card": {
+              "rank": "A",
+              "suit": "H"
+            },
+            "ledSuit": true,
+            "isTrump": false,
+            "inertTrump": false,
+            "winning": false
+          }
+        ],
+        "winner": "S",
+        "points": 2,
+        "events": [
+          {
+            "type": "reveal",
+            "atTrick": 6,
+            "by": "S",
+            "suit": "D"
+          }
+        ]
+      }
+    ],
+    "runningPoints": [
+      {
+        "afterTrick": 1,
+        "we": 4,
+        "they": 0
+      },
+      {
+        "afterTrick": 2,
+        "we": 7,
+        "they": 0
+      },
+      {
+        "afterTrick": 3,
+        "we": 8,
+        "they": 0
+      },
+      {
+        "afterTrick": 4,
+        "we": 14,
+        "they": 0
+      },
+      {
+        "afterTrick": 5,
+        "we": 14,
+        "they": 1
+      },
+      {
+        "afterTrick": 6,
+        "we": 16,
+        "they": 1
+      }
+    ],
+    "result": {
+      "biddingTeamPoints": 28,
+      "made": true,
+      "tier": "21-27",
+      "gamePointsAwarded": 2,
+      "multiplier": 1,
+      "endReason": "claim",
+      "claim": {
+        "by": "S",
+        "atTrick": 7,
+        "awardedToTeam": 0
+      }
+    }
+  },
+  "flags": [
+    {
+      "id": "f1",
+      "anchorTrick": 0,
+      "subjectPlay": null,
+      "relatedTricks": [],
+      "note": "West could have considered bidding beyond 21 on the back of its hearts and especially the marriage, and also knowing that East had bid. It means that it would have a good card hand. That could be a possibility.",
+      "createdAt": "2026-06-04T07:45:37.075Z"
+    },
+    {
+      "id": "f2",
+      "anchorTrick": 5,
+      "subjectPlay": null,
+      "relatedTricks": [],
+      "note": "This hand, it made no sense for East not to have played its jack. It should have played the jack and claimed whatever points it was getting in this particular case. Giving it away makes no sense in this case.",
+      "createdAt": "2026-06-04T07:46:17.753Z"
+    },
+    {
+      "id": "f3",
+      "anchorTrick": 6,
+      "subjectPlay": null,
+      "relatedTricks": [],
+      "note": "Okay, one UI bug that I saw was when the marriage was revealed, I didn't have the option of claiming or conceding. I would have claimed the game, but I didn't have this option because it was not available here.",
+      "createdAt": "2026-06-04T07:47:04.489Z"
+    }
+  ],
+  "readableSummary": "Hand 4 — Bidder S, bid 21, trump ♦ (revealed trick 6 by S). Marriage: S −4 at trick 5.\nResult: MADE — took 28 of 17 needed. +2 game pts (claim). Match now We 4 / They 0.\n\nTrick 1: S ♦J; E ♦10; N ♦8; W ♥7  → S wins (+4)\nTrick 2: S ♦9; E ♦A; N ♠7; W ♥8  → S wins (+3)\nTrick 3: S ♠Q; E ♠K; N ♠A; W ♠8  → N wins (+1)\nTrick 4: N ♠J; W ♠10; S ♣8; E ♠9  → N wins (+6)\nTrick 5: N ♣7; W ♣10; S ♣K; E ♣Q  → W wins (+1)\nTrick 6: W ♥Q; S ♦7; E ♥10; N ♥A  → S wins (+2)\n\nFLAGS\n- Bidding: \"West could have considered bidding beyond 21 on the back of its hearts and especially the marriage, and also knowing that East had bid. It means that it would have a good card hand. That could be a possibility.\"\n- Trick 5: \"This hand, it made no sense for East not to have played its jack. It should have played the jack and claimed whatever points it was getting in this particular case. Giving it away makes no sense in this case.\"\n- Trick 6: \"Okay, one UI bug that I saw was when the marriage was revealed, I didn't have the option of claiming or conceding. I would have claimed the game, but I didn't have this option because it was not available here.\""
+}
