@@ -607,3 +607,45 @@ function claimHolds(hands, currentTrick, toPlay, trumpSuit, claimSeat, seatsInPl
 
   return rec(hands, currentTrick.slice(), toPlay).ok;
 }
+
+// Forced line for a SOLO claim (#3 review playout): returns an array of synthetic tricks (shape
+// {leader, winner, plays:[{seat,card}], points, claimed:true}) in which `claimSeat` wins EVERY remaining
+// trick against the defenders' best play, or null if it doesn't sweep / the search exceeds the cap. Same
+// full-knowledge model as claimHolds; call only after claimHolds confirmed a sweep exists.
+function computeClaimLine(hands, leader, trumpSuit, claimSeat, seatsInPlay) {
+  const numSeats   = seatsInPlay.length;
+  const nextInPlay = (s) => seatsInPlay[(seatsInPlay.indexOf(s) + 1) % numSeats];
+  const MAX_NODES  = 200000;
+  let nodes = 0;
+
+  function rec(hs, trick, seat, leaderSeat) {
+    if (++nodes > MAX_NODES) return null;
+    if (trick.length === numSeats) {
+      const winner   = trickWinner(trick, trumpSuit);
+      const nonClaim = winner === claimSeat ? 0 : 1;
+      const pts      = trick.reduce((a, t) => a + POINT_VALUE[t.card.rank], 0);
+      const here = { leader: leaderSeat, winner, points: pts, claimed: true,
+                     plays: trick.map(t => ({ seat: t.playerIndex, card: t.card })) };
+      const remaining = seatsInPlay.reduce((a, s) => a + hs[s].length, 0);
+      if (remaining === 0) return { score: nonClaim, line: [here] };
+      const sub = rec(hs, [], winner, winner);
+      return sub ? { score: nonClaim + sub.score, line: [here].concat(sub.line) } : null;
+    }
+    const led        = trick.length ? trick[0].card.suit : null;
+    const legal      = legalPlays(hs[seat], led);
+    const maximizing = seat !== claimSeat;        // defenders maximize non-claimant tricks; claimant minimizes
+    let best = null;
+    for (const card of legal) {
+      const hs2 = hs.slice();
+      hs2[seat] = hs[seat].filter(c => !sameCard(c, card));
+      const sub = rec(hs2, trick.concat([{ playerIndex: seat, card }]), nextInPlay(seat), leaderSeat);
+      if (!sub) return null;                       // node cap hit below
+      if (best === null || (maximizing ? sub.score > best.score : sub.score < best.score)) best = sub;
+      if (!maximizing && best.score === 0) break;  // claimant: 0 non-claimant tricks is optimal — stop early
+    }
+    return best;
+  }
+
+  const res = rec(hands, [], leader, leader);
+  return res && res.score === 0 ? res.line : null;
+}

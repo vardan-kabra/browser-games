@@ -24,7 +24,7 @@ const glue = `;Object.assign(globalThis, {
   SUITS, RANK_ORDER, POINT_VALUE, cardKey, cardBeats, trickWinner, sameCard, legalPlays,
   AI_TUNING, aiLead, aiFollowSuit, aiPlayCard, aiDiscard, aiBidValue, aiBidValueAgainstHolder,
   aiShouldReveal, aiShouldSingleHand, isBoss, highestCard, lowestCard, highestPointCard,
-  trickCurrentWinner, ntLengthWinners, safeDiscard,
+  trickCurrentWinner, ntLengthWinners, safeDiscard, computeClaimLine,
 });`;
 eval(cardsSrc + '\n' + aiSrc + '\n' + glue);
 
@@ -262,6 +262,32 @@ section('#1b draw trumps (void-inference; stops once opponents are void = #5b)')
         aiLead(declHand, 'spades', seen([], [], null, false, 'declarer', 0, null)), C('8','d'));
   check('seen=null legacy → no draw, lead low ♦8',
         aiLead(declHand, 'spades', null), C('8','d'));
+}
+
+// ══════════════════════════════════════════════════════════════════════════════════
+// #3 review — computeClaimLine returns the forced sweep (Hand 15 ending)
+// ══════════════════════════════════════════════════════════════════════════════════
+section('#3 computeClaimLine — forced claim sweep (Hand 15)');
+{
+  // Hand 15 trick-6 ending: N(2) on lead, trump ♦, West(3) claims and wins all 3 tricks.
+  const hands = [
+    [C('A','c'),C('9','d'),C('J','c')],   // S
+    [C('9','s'),C('K','s'),C('A','s')],   // E
+    [C('A','d'),C('10','c'),C('9','c')],  // N
+    [C('J','d'),C('K','d'),C('10','d')],  // W (holds boss ♦J)
+  ];
+  const line = computeClaimLine(hands, 2, 'diamonds', 3, [0,1,2,3]);
+  checkTrue('line found, 3 tricks', !!line && line.length === 3);
+  checkTrue('claimant W(3) wins every trick', !!line && line.every(t => t.winner === 3));
+  checkTrue('each synthetic trick has 4 plays', !!line && line.every(t => t.plays.length === 4));
+  // control: move the boss ♦J to South → West can no longer sweep → null
+  const noSweep = [
+    [C('A','c'),C('J','d'),C('J','c')],   // S now holds the boss ♦J
+    [C('9','s'),C('K','s'),C('A','s')],
+    [C('A','d'),C('10','c'),C('9','c')],
+    [C('9','d'),C('K','d'),C('10','d')],  // W lost the boss
+  ];
+  checkTrue('no forced sweep → null', computeClaimLine(noSweep, 2, 'diamonds', 3, [0,1,2,3]) === null);
 }
 
 // ══════════════════════════════════════════════════════════════════════════════════

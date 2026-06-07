@@ -606,7 +606,11 @@ the follow-suit branch just doesn't consult it when the partner is already winni
 - ✅ **Green "led" arrow in Review — DONE 2026-06-07 (hand 14 f2).** Each review step marks the trick's
   leader (`state.tricks[k].leader`) with a green ▸ on that seat's label (`.player-label.review-leader::before`,
   cleared per step in `clearReviewWinner`). Cache-busters `style.css v15→v16`.
-- ⏳ **Play out the claimed line in Review (hand 15 f1 / Thread 3 follow-up).** Review currently stops at the
-  last *played* trick; after a claim it should step through the **forced** remaining tricks so the player can
-  see the claim was justified. Needs a `computeClaimLine` (the claim solver returns only a boolean today) +
-  review plumbing for synthetic post-claim tricks. Designed but not yet built.
+- ✅ **Play out the claimed line in Review — DONE 2026-06-07 (hand 15 f1 / Thread 3 follow-up).** After a
+  claim, review now steps through the **forced** remaining tricks (labeled "claimed line") so the player can
+  see the claim was justified. New `computeClaimLine` (ai.js) — a PV-minimax mirroring `claimHolds` that
+  returns the synthetic trick sequence where the claimant sweeps vs best defense (null if no sweep / over the
+  node cap). `acceptClaim` captures it into `state.claimLine` (pre-merge); a new `reviewTricks()` =
+  `state.tricks ∪ state.claimLine` routes the stepper / `reviewHandAt` / indicator so the synthetic tricks
+  render and hands shrink seamlessly. Claims only (concede shows no playout). Cache-busters `ai.js v17→v18`,
+  `game.js v20→v21`. **The review-mode UI thread (all three hand-14/15 items) is now complete.**

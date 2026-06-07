@@ -246,6 +246,7 @@ function startHand() {
   state.trumpSuit      = null;
   state.trumpRevealed  = false;
   state.trumpRevealTrick = null;   // #UI — 0-based trick index where trump was revealed (for review)
+  state.claimLine      = null;     // #UI — forced post-claim line for the review playout (null = none)
   state.isNoTrump      = false;
   state.forceTrumpOnly = false;
   state.marriageAdj = 0;
@@ -1007,10 +1008,21 @@ function awardRemaining(toTeam, banner) {
   finishHand();
 }
 
+// #UI — capture the forced winning line of a SOLO claim so review can play it out. Reconstructs the full
+// remaining hands (in-flight trick merged back) + the next leader, then asks computeClaimLine (ai.js).
+function buildClaimLine(claimSeat) {
+  const hands = state.hands.map(h => h.slice());
+  for (const tp of state.currentTrick) hands[tp.playerIndex] = hands[tp.playerIndex].concat([tp.card]);
+  const leader = state.currentTrick.length ? state.currentTrick[0].playerIndex : claimSeat;
+  try { return computeClaimLine(hands, leader, state.trumpSuit, claimSeat, activeSeats()) || null; }
+  catch (e) { console.warn('[review] computeClaimLine failed', e); return null; }
+}
+
 // A solo claim by `claimSeat` — that seat wins every remaining trick by itself.
 function acceptClaim(claimSeat) {
   const t = tricksRemaining();
   feedbackLog.noteEnd({ reason: 'claim', atTrick: state.tricks.length + 1, by: claimSeat, awardedToTeam: teamOf(claimSeat) });
+  state.claimLine = buildClaimLine(claimSeat);   // #UI — forced line for the review playout (computed pre-merge)
   awardRemaining(teamOf(claimSeat),
     `★ ${seatName(claimSeat)} claims the remaining ${t} ${t === 1 ? 'trick' : 'tricks'} — accepted!`);
 }
@@ -1584,9 +1596,10 @@ function reviewAvailable() {
 function reviewHandAt(seat, k) {
   const dealt = state.dealtHands[seat] || [];
   if (k < 0) return dealt.slice();
+  const tr = reviewTricks();
   const played = [];
-  for (let i = 0; i <= k && i < state.tricks.length; i++) {
-    for (const p of state.tricks[i].plays) if (p.seat === seat) played.push(p.card);
+  for (let i = 0; i <= k && i < tr.length; i++) {
+    for (const p of tr[i].plays) if (p.seat === seat) played.push(p.card);
   }
   return dealt.filter(c => !played.some(pc => sameCard(pc, c)));
 }
@@ -1631,9 +1644,14 @@ function onCloseReview() {
   if (endHandPanel && state.phase === PHASE.HAND_SCORING) endHandPanel();
 }
 
+// #UI — real tricks + (after a claim) the forced "claimed line" appended, so review steps into it.
+function reviewTricks() {
+  return (state.claimLine && state.claimLine.length) ? state.tricks.concat(state.claimLine) : state.tricks;
+}
 // Render one review step: k = -1 → Bidding (auction + full hands); k ≥ 0 → that trick's cards.
 function renderReviewTrick(k) {
-  const n = state.tricks.length;
+  const tr = reviewTricks();
+  const n = tr.length;
   reviewTrickIndex = Math.max(-1, Math.min(k, n - 1));
   clearReviewWinner();
   for (let s = 0; s < 4; s++) renderHand(s);          // shrink the fans to this step (full deal at Bidding)
@@ -1645,7 +1663,7 @@ function renderReviewTrick(k) {
     showReviewAuction(true);                          // Bidding view: auction table in the centre
   } else {
     showReviewAuction(false);
-    const trick = state.tricks[reviewTrickIndex];
+    const trick = tr[reviewTrickIndex];
     for (const p of trick.plays) {                    // length 3 in a Single Hand → sitting-out slot stays empty
       const slot = document.getElementById(`trick-slot-${p.seat}`);
       if (slot) slot.appendChild(createCardEl(p.card, true));
@@ -1671,9 +1689,10 @@ function clearReviewWinner() {
   }
 }
 function onReviewPrev() { if (reviewTrickIndex > -1) renderReviewTrick(reviewTrickIndex - 1); }
-function onReviewNext() { if (reviewTrickIndex < state.tricks.length - 1) renderReviewTrick(reviewTrickIndex + 1); }
+function onReviewNext() { if (reviewTrickIndex < reviewTricks().length - 1) renderReviewTrick(reviewTrickIndex + 1); }
 function updateReviewIndicator() {
-  const n = state.tricks.length;
+  const tr = reviewTricks();
+  const n = tr.length;
   const prev = document.getElementById('review-prev');
   const next = document.getElementById('review-next');
   if (reviewTrickIndex < 0) {                         // Bidding step
@@ -1683,12 +1702,12 @@ function updateReviewIndicator() {
     if (next) next.disabled = n === 0;
     return;
   }
-  const t = state.tricks[reviewTrickIndex];
+  const t = tr[reviewTrickIndex];
   setText('review-count', `Trick ${reviewTrickIndex + 1} / ${n}`);
   if (prev) prev.disabled = false;                   // ‹ always available — steps back toward Bidding
   if (next) next.disabled = reviewTrickIndex >= n - 1;
   const revealHere = state.trumpRevealTrick != null && reviewTrickIndex === state.trumpRevealTrick && !state.isNoTrump;
-  setText('review-meta', (t ? `${seatName(t.winner)} wins (+${t.points})` : '')
+  setText('review-meta', (t ? `${seatName(t.winner)} wins (+${t.points})${t.claimed ? ' · claimed line' : ''}` : '')
     + (revealHere ? ` · 🔔 ${SUIT_SYMBOL[state.trumpSuit]} revealed` : ''));
 }
 
