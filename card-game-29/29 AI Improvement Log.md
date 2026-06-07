@@ -336,6 +336,33 @@ pitches ♠8 (keeps ♣8), legacy null path still ♣8, 0 console errors. Cache-
 length/control it should *lead* trumps to strip the opponents' (hand 3 f2/f3) — a larger strategic add,
 not in this pass.
 
+## Changes applied — 2026-06-07 (defender reveal-to-ruff — Thread 2)
+
+From hand 14 f1 — a **defender** that should have revealed to ruff. Tunes the **defender-caution dial**
+left open after the #6 reveal pass. Additive: only the defender branch of `aiShouldReveal` changes, and
+only in the endgame; mid-hand behaviour is byte-identical to the shipped #6 thresholds.
+
+- ✅ **#2 — defenders reveal more readily in the endgame (`aiShouldReveal`).** A defender's reveal wakes
+  the bidder's trump for everyone (costly), so the conservative #6 bars stay for most of the hand. But in
+  the **last few tricks** (`hand.length <= AI_TUNING.reveal.endgameMax`, default 3) waking trump costs
+  little — the declarer has almost no hand left to exploit it — so the bars relax: a J/9 ruffer reveals on
+  a worth-it **or developing** trick, and a bare Ace on a worth-it (≥2-pt) trick (mid-hand it still needs
+  ≥3). Declaring-side logic and every mid-hand defender threshold are untouched.
+  - *Evidence:* Hand 14, trick 6 — West (defender), void in ♠ with `10♦ A♣ A♦` (bare aces, no J/9), on N's
+    ♠9 lead (2 pts, still developing), 3 cards left. The old bare-Ace ≥3 bar (measured on the 2 pts then
+    visible) declined; revealing ruffs the trick safely (N already played; S/E must follow ♠) and, per the
+    user, swings the hand. Now fires.
+
+**Verification.** `node card-game-29/test-ai.js` → **67/67** (3 new #2 cases: the Hand-14 endgame reveal,
+a 5-card mid-hand contrast that still holds, and an endgame J/9-on-developing case; every shipped #6
+defender / declarer / declaring-side case still green, incl. the mid-hand "bare Ace 2-pt → hold"). `node
+--check` clean. Live bundle: `ai.js?v=16`, `AI_TUNING.reveal.endgameMax=3`, the Hand-14 position now reveals
+while its 5-card sibling holds, 0 console errors. Cache-buster: `ai.js v15→v16` (game.js unchanged).
+
+**Note:** based on a single hand (consistent with the #6 residual that first flagged this dial). The
+endgame gate is the conservative, principled scope — revisit `endgameMax` or extend to mid-hand only if
+more defender reveal flags accumulate.
+
 ## Game log
 
 ### Game 1 — match `m-1780499431173` · 2026-06-03

@@ -345,6 +345,27 @@ section('#6 reveal-to-ruff thresholds');
 }
 
 // ══════════════════════════════════════════════════════════════════════════════════
+// #2 — defenders relax reveal-to-ruff bars in the ENDGAME (Hand 14)
+// ══════════════════════════════════════════════════════════════════════════════════
+section('#2 defender endgame reveal relaxation');
+{
+  // Hand 14, trick 6: West (defender, seat 3; declarer N=2) is void in spades with bare aces (10♦ A♣
+  // A♦) on a developing 2-pt trick (N led ♠9). 3 cards left = endgame → reveal (mid-hand it would hold).
+  const wEnd = [C('10','d'),C('A','c'),C('A','d')];
+  const t9s  = [play(2, C('9','s'))];
+  checkTrue('Hand 14: defender bare-Ace, endgame (3 cards), 2-pt trick → reveal',
+            aiShouldReveal(3, wEnd, t9s, 2, null));
+  // same shape but mid-hand (5 cards) → still holds (endgame-gated; bare Ace needs ≥3 off-endgame)
+  const wMid = [C('10','d'),C('A','c'),C('A','d'),C('8','h'),C('7','c')];
+  checkTrue('same defender bare-Ace mid-hand (5 cards), 2-pt trick → hold',
+            !aiShouldReveal(3, wMid, t9s, 2, null));
+  // endgame also relaxes a J/9 ruffer onto a developing 0-pt trick
+  const wJ9 = [C('9','h'),C('A','c'),C('7','d')];
+  checkTrue('defender J/9 ruffer, endgame, developing 0-pt trick → reveal',
+            aiShouldReveal(3, wJ9, [play(2, C('Q','s'))], 2, null));
+}
+
+// ══════════════════════════════════════════════════════════════════════════════════
 // C9 — Single Hand declaration sanity (unchanged logic, guards against accidental edits)
 // ══════════════════════════════════════════════════════════════════════════════════
 section('C9 single-hand sanity');

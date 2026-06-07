@@ -19,6 +19,7 @@ const AI_TUNING = {
   singleHand: { longTrumpMin: 6, midTrumpMin: 5, outsideAcesMin: 2 },  // C9
   scoreLean:  { ahead: 5, behind: -5, ceilingShift: 1 },  // C12 — ±1 to ceilings near ±5
   play: { nt: { establishMin: 4, establishStrong: 5, declarerLengthMin: 2, reentryKeep: 1 } },  // #3 — No-Trump play
+  reveal: { endgameMax: 3 },  // #2 — defenders relax the reveal-to-ruff bars in the last few tricks
 };
 
 // Team layout matches game.js: team 0 = N–S (seats 0,2), team 1 = E–W (seats 1,3).
@@ -247,9 +248,14 @@ function aiShouldReveal(seat, hand, trick, declarer, knownTrump) {
     if (honoursNonLed >= 1) return worthIt || developing;      // strong ruffer: worth-it OR still-growing
     return worthIt;                                            // bare Ace: only a worth-it trick
   }
-  // Defender (unchanged from the shipped #6 thresholds): J/9 → worth-it; bare Ace → a richer ≥3-pt trick.
-  if (honoursNonLed >= 1) return worthIt;
-  return trickPts >= 3;
+  // Defender: wakes the bidder's trump for everyone (costly), so keeps the conservative #6 bars — J/9 →
+  // worth-it; bare Ace → a richer ≥3-pt trick. EXCEPT in the ENDGAME (few cards left, #2): waking trump
+  // then costs little (little hand left for the declarer to exploit it), so relax — J/9 → worth-it OR
+  // developing, bare Ace → worth-it. (Hand 14: West, void with bare aces on a developing 2-pt trick at
+  // trick 6, should ruff.)
+  const endgame = hand.length <= AI_TUNING.reveal.endgameMax;
+  if (honoursNonLed >= 1) return endgame ? (worthIt || developing) : worthIt;
+  return endgame ? worthIt : (trickPts >= 3);
 }
 
 // ── AI: Card play ─────────────────────────────────────────────────────────────
