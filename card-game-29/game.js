@@ -635,6 +635,12 @@ function advancePlay() {
   }
 }
 
+// #3 — the AI's role in a No-Trump deal (drives role-aware NT play in ai.js). Null outside NT.
+function _ntRole(seat, declarer) {
+  if (seat === declarer) return 'declarer';
+  return (seat % 2 === declarer % 2) ? 'partner' : 'defender';
+}
+
 function doAIPlay() {
   // Safety guards — bail if game state is no longer valid for AI play
   if (state.phase !== PHASE.PLAYING) return;
@@ -687,6 +693,7 @@ function doAIPlay() {
     toActAfter,
     declarerTrump: (seat === state.declarer && !state.trumpRevealed && !state.isNoTrump) ? state.trumpSuit : null,
     noTrump: state.isNoTrump === true,   // #3 — gates the No-Trump play strategy (false under concealed/active trump)
+    role: state.isNoTrump ? _ntRole(seat, state.declarer) : null,   // #3 Phase 2 — declarer/partner/defender
   };
 
   let card;

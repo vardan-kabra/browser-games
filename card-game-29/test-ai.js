@@ -24,7 +24,7 @@ const glue = `;Object.assign(globalThis, {
   SUITS, RANK_ORDER, POINT_VALUE, cardKey, cardBeats, trickWinner, sameCard, legalPlays,
   AI_TUNING, aiLead, aiFollowSuit, aiPlayCard, aiDiscard, aiBidValue, aiBidValueAgainstHolder,
   aiShouldReveal, aiShouldSingleHand, isBoss, highestCard, lowestCard, highestPointCard,
-  trickCurrentWinner,
+  trickCurrentWinner, ntLengthWinners,
 });`;
 eval(cardsSrc + '\n' + aiSrc + '\n' + glue);
 
@@ -36,8 +36,8 @@ const RSUIT = { spades: '♠', hearts: '♥', diamonds: '♦', clubs: '♣' };
 
 const C    = (rank, suitCh) => ({ rank, suit: SUIT[suitCh] });          // C('J','s') → ♠J
 const play = (seat, card)   => ({ playerIndex: seat, card });
-const seen = (played = [], toActAfter = [], declarerTrump = null, noTrump = false) =>
-  ({ played: new Set(played.map(cardKey)), toActAfter, declarerTrump, noTrump });
+const seen = (played = [], toActAfter = [], declarerTrump = null, noTrump = false, role = null) =>
+  ({ played: new Set(played.map(cardKey)), toActAfter, declarerTrump, noTrump, role });
 
 const isCard = (x) => x && typeof x === 'object' && 'rank' in x && 'suit' in x;
 const cstr   = (c) => isCard(c) ? `${c.rank}${RSUIT[c.suit]}` : String(c);
@@ -187,6 +187,49 @@ section('#3 Phase 1 — Game-1 NT: cash the top club instead of leading ♥8');
         aiLead(westHand, null, seen(g1played, [], null, true)), C('9','c'));
   check('legacy (seen=null) reproduces the ♥8 blunder',
         aiLead(westHand, null, null), C('8','h'));
+}
+
+// ══════════════════════════════════════════════════════════════════════════════════
+// #3 Phase 2 — NT declarer: estimate length winners; establish before cashing a lone side boss
+// ══════════════════════════════════════════════════════════════════════════════════
+section('#3 Phase 2 — ntLengthWinners estimate');
+{
+  const five = [C('K','s'),C('10','s'),C('8','s'),C('7','s'),C('Q','s')];
+  const four = [C('K','s'),C('10','s'),C('8','s'),C('7','s')];
+  check('5-card suit, none played → 2 length winners', ntLengthWinners('spades', five, seen([])), 2);
+  check('4-card suit, none played → 0 length winners', ntLengthWinners('spades', four, seen([])), 0);
+  check('5-card suit, 2 already played → 4 length winners',
+        ntLengthWinners('spades', five, seen([C('J','s'),C('9','s')])), 4);
+  check('no card-tracking (seen=null) → 0', ntLengthWinners('spades', five, null), 0);
+}
+
+section('#3 Phase 2 — declarer establishes before cashing a lone side boss');
+{
+  // Declarer holds 5 spades (developable, 2 length winners) + ♣A (a lone side boss; ♣J/♣9 gone). In
+  // NT it should establish spades (lead low ♠7) and keep ♣A as the re-entry — NOT cash ♣A first.
+  const hand = [C('K','s'),C('10','s'),C('8','s'),C('7','s'),C('Q','s'),C('A','c')];
+  const pj9  = [C('J','c'),C('9','c')];   // makes ♣A the boss club
+  check('declarer + NT → establish spades, lead low ♠7',
+        aiLead(hand, null, seen(pj9, [], null, true, 'declarer')), C('7','s'));
+  check('defender + NT → cash the boss ♣A (no establish-first)',
+        aiLead(hand, null, seen(pj9, [], null, true, 'defender')), C('A','c'));
+  check('declarer + noTrump=false → cash ♣A (NT gate)',
+        aiLead(hand, null, seen(pj9, [], null, false, 'declarer')), C('A','c'));
+  check('legacy (seen=null) → lowest zero-point ♠7',
+        aiLead(hand, null, null), C('7','s'));
+
+  // reentryKeep gate: with TWO side bosses (♣A + ♥A) the declarer has enough entries → just cash
+  // (boss-cash picks ♥A: hearts before clubs at equal length), don't establish-first.
+  const hand2 = [C('K','s'),C('10','s'),C('8','s'),C('7','s'),C('Q','s'),C('A','c'),C('A','h')];
+  check('declarer + 2 side bosses → cash a boss (♥A), not establish',
+        aiLead(hand2, null, seen([C('J','c'),C('9','c'),C('J','h'),C('9','h')], [], null, true, 'declarer')),
+        C('A','h'));
+
+  // declarerLengthMin gate: a 4-card suit (♥10-9-8-7 — an honour but 0 length winners) lacks length
+  // potential → the declarer cashes the side boss ♣A normally instead of establishing.
+  const hand3 = [C('10','h'),C('9','h'),C('8','h'),C('7','h'),C('A','c')];
+  check('declarer + 4-card suit (no length winners) → cash ♣A',
+        aiLead(hand3, null, seen([C('J','c'),C('9','c')], [], null, true, 'declarer')), C('A','c'));
 }
 
 // ══════════════════════════════════════════════════════════════════════════════════

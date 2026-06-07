@@ -18,7 +18,7 @@ const AI_TUNING = {
   partner:  { supportPtsMin: 10, takeoverSuitMin: 4, supportMax: 20 },   // C2 partner rule
   singleHand: { longTrumpMin: 6, midTrumpMin: 5, outsideAcesMin: 2 },  // C9
   scoreLean:  { ahead: 5, behind: -5, ceilingShift: 1 },  // C12 — ±1 to ceilings near ±5
-  play: { nt: { establishMin: 4, establishStrong: 5 } },  // #3 — No-Trump play: establish a long suit
+  play: { nt: { establishMin: 4, establishStrong: 5, declarerLengthMin: 2, reentryKeep: 1 } },  // #3 — No-Trump play
 };
 
 // Team layout matches game.js: team 0 = N–S (seats 0,2), team 1 = E–W (seats 1,3).
@@ -307,6 +307,20 @@ function aiLead(hand, trumpSuit, seen = null) {
     return inSuit(jackSuits[0]).find(c => c.rank === 'J');
   }
 
+  // 1.5) No Trump DECLARER (#3 Phase 2): with a developable long suit that has real length potential,
+  //      establish it (lead LOW) BEFORE cashing a lone side boss — keep that boss as the re-entry to
+  //      cash the established length later. Only when side bosses are scarce (<= reentryKeep), so we
+  //      don't strand cashable winners. Defenders/partner fall through to the normal cash-then-
+  //      establish order. Gated to seen.noTrump so concealed/active trump is untouched.
+  if (seen && seen.noTrump && seen.role === 'declarer') {
+    const T = AI_TUNING.play.nt;
+    const longSuit = ntLongestEstablishSuit(hand, avoidSuit, seen);
+    if (longSuit && ntLengthWinners(longSuit, hand, seen) >= T.declarerLengthMin) {
+      const sideBosses = hand.filter(c => c.suit !== longSuit && isBoss(c, hand, seen));
+      if (sideBosses.length <= T.reentryKeep) return lowestCard(inSuit(longSuit));
+    }
+  }
+
   // 2) Cash established winners: if we hold the boss (highest unseen card) of a non-avoid suit,
   //    run the longest such suit, leading its highest boss. Needs played-card tracking (`seen`).
   if (seen) {
@@ -488,6 +502,20 @@ function ntLongestEstablishSuit(hand, avoidSuit, seen) {
     }
   }
   return best;
+}
+
+// NT length-winner estimate (#3 Phase 2): once every other hand is void in a suit, our remaining
+// cards all win regardless of rank. outstanding = cards still out (8 − what we hold − what's been
+// played); after they fall, max(0, myLen − outstanding) of our cards are length winners. An
+// OPTIMISTIC lower-bound (assumes we keep the lead to run the suit) — used only to bias the declarer
+// toward developing a genuinely long suit, never as a claim. Returns 0 without card tracking.
+function ntLengthWinners(suit, hand, seen) {
+  if (!seen || !seen.played) return 0;
+  const myLen = cardsInSuit(hand, suit).length;
+  let playedInSuit = 0;
+  for (const k of seen.played) if (k.endsWith('-' + suit)) playedInSuit++;
+  const outstanding = Math.max(0, 8 - myLen - playedInSuit);
+  return Math.max(0, myLen - outstanding);
 }
 
 /** Discard lowest-point card; prefer zero-point cards */

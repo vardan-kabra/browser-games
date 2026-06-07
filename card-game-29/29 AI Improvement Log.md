@@ -77,9 +77,12 @@
    - *Candidate:* an NT branch in `aiPlayCard`/`aiLead` that prioritizes cashing sure winners and
      establishing the longest suit.
    - ✅ **Phase 1 applied (2026-06-07)** — the "establish the longest suit" lead + the `seen.noTrump`
-     gate (see "Changes applied — 2026-06-07"). Cashing sure winners was already handled by #1; Phase 1
-     adds the *develop a long suit* half. Phases 2–4 (declarer winner-count, re-entry / hold-up, defender
-     partner-suit) remain open — staged so each is a small, test-covered, reversible diff.
+     gate. Cashing sure winners was already handled by #1; Phase 1 adds the *develop a long suit* half.
+   - ✅ **Phase 2 applied (2026-06-07)** — role-aware declarer play (`seen.role`, `ntLengthWinners`): the
+     NT declarer **establishes a strong long suit before cashing a lone side boss** (keeps it as a
+     re-entry). This **folded in the planned Phase 3a** (re-entry retention) — they were one behaviour.
+     **Still open:** Phase 3b (narrow hold-up — likely dropped, low ROI in point-dense 29) and Phase 4
+     (defender partner-suit inference via `seen.history`). Staged as small, test-covered, reversible diffs.
 
 ### Bidding — `ai.js`
 4. **Aggressiveness of the ceiling stack.** `aiBidValue` (ai.js:59–81) stacks `fiveSuitBonus (+2)` and
@@ -265,6 +268,36 @@ green. `node --check` clean on `ai.js`/`game.js`. Cache-busters: `ai.js v12→v1
 (`seen.role`, `estimateNtTricks`); **Phase 3** re-entry retention (3a) + narrow hold-up (3b, may be
 dropped — low ROI in point-dense 29); **Phase 4** defender partner-suit inference (`seen.history`). #3
 stays **partially applied** until those land.
+
+## Changes applied — 2026-06-07 (No-Trump pass, Phase 2)
+
+Second phase of **Candidate #3** — role-aware declarer play, **merging in the planned Phase 3a** (they
+were one behaviour). Still additive and `seen.noTrump`-gated (concealed trump untouched); now also
+role-gated.
+
+**Enabling change.** `doAIPlay` (game.js) sets `seen.role` (`'declarer'|'partner'|'defender'`, via the new
+`_ntRole(seat, declarer)`; `null` outside NT) so the play heuristics can act by role.
+
+- ✅ **#3 Phase 2 — declarer establishes a long suit before cashing a lone side boss (`aiLead`).** A new
+  NT-declarer branch sits **before** the boss-cash branch: with a developable long suit that has real
+  length potential (`ntLengthWinners(suit) >= declarerLengthMin`, i.e. genuinely 5+ at the table) and only
+  a **lone side boss** (`<= reentryKeep`), the declarer leads low to **establish** the long suit, keeping
+  the side boss as the **re-entry** to cash that length later — instead of cashing the boss immediately and
+  losing the tempo to develop. Defenders/partner keep the normal cash-then-establish order. New helper
+  `ntLengthWinners` (optimistic length-winner estimate from `seen.played`); new dials
+  `AI_TUNING.play.nt.declarerLengthMin:2` / `reentryKeep:1`. (`estimateNtTricks` from the plan was *not*
+  added — nothing consumed it; `ntLengthWinners` is the primitive the decision actually needs.)
+
+**Verification.** `node card-game-29/test-ai.js` → **59/59** (10 new #3 Phase-2 cases: `ntLengthWinners`
+estimates incl. `seen=null→0`; declarer-establishes-♠7 vs defender-cashes-♣A vs `noTrump=false`→cash gate;
+the `reentryKeep` gate — 2 side bosses → cash; the `declarerLengthMin` gate — a 4-card suit → cash; every
+prior case green). `node --check` clean. Live no-cache bundle: `ai.js v14`/`game.js v18`, `_ntRole` live
+(`declarer`/`partner`/`defender`), `doAIPlay` wires `role`, the declarer/defender/gate verdicts correct,
+0 console errors. Cache-busters: `ai.js v13→v14`, `game.js v17→v18`. **Note:** this only changes *which
+legal card* the declarer leads — never legality — so the per-hand 29-point balance is unaffected.
+
+**Deferred:** **Phase 3b** narrow hold-up (low ROI — likely dropped) and **Phase 4** defender partner-suit
+inference (`seen.history`). #3 stays **partially applied** until Phase 4 lands.
 
 ## Game log
 
