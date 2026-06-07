@@ -18,6 +18,7 @@ const AI_TUNING = {
   partner:  { supportPtsMin: 10, takeoverSuitMin: 4, supportMax: 20 },   // C2 partner rule
   singleHand: { longTrumpMin: 6, midTrumpMin: 5, outsideAcesMin: 2 },  // C9
   scoreLean:  { ahead: 5, behind: -5, ceilingShift: 1 },  // C12 — ±1 to ceilings near ±5
+  play: { nt: { establishMin: 4, establishStrong: 5 } },  // #3 — No-Trump play: establish a long suit
 };
 
 // Team layout matches game.js: team 0 = N–S (seats 0,2), team 1 = E–W (seats 1,3).
@@ -317,6 +318,15 @@ function aiLead(hand, trumpSuit, seen = null) {
     }
   }
 
+  // 2.5) No Trump only (#3): no Jack to lead and no boss to cash → establish our longest
+  //      developable suit by leading LOW; its small cards promote to winners once the suit is
+  //      exhausted elsewhere. Gated to seen.noTrump so it never fires under a concealed/active
+  //      trump (where developing a side suit could feed a ruff). Needs card tracking (`seen`).
+  if (seen && seen.noTrump) {
+    const establishSuit = ntLongestEstablishSuit(hand, avoidSuit, seen);
+    if (establishSuit) return lowestCard(inSuit(establishSuit));
+  }
+
   // 3) Lead the lowest zero-point card, preferring a non-avoid suit.
   const lowestZero = (cards) => {
     const zero = cards.filter(c => POINT_VALUE[c.rank] === 0);
@@ -452,6 +462,32 @@ function isBoss(card, myHand, seen) {
     return false;                                                      // a higher card is still out
   }
   return true;
+}
+
+// NT only (#3): pick our longest "developable" suit to establish by leading LOW — its small cards
+// become winners once the suit is exhausted in the other hands (no trump can ruff length away). A
+// suit qualifies only if it is long enough (establishMin), is NOT a pure cash (all bosses → the
+// boss branch already runs it), and either holds a J/9 or is very long (establishStrong) so we
+// don't bleed a ragged top-less suit into opponents' tricks. Tie-break mirrors preferredTrumpSuit:
+// length → honours(J/9) → points. Returns the suit, or null (→ fall through to the low-lead).
+function ntLongestEstablishSuit(hand, avoidSuit, seen) {
+  const T = AI_TUNING.play.nt;
+  let best = null, bestKey = [-1, -1, -1];
+  for (const suit of SUITS) {
+    if (suit === avoidSuit) continue;
+    const sc = cardsInSuit(hand, suit);
+    if (sc.length < T.establishMin) continue;
+    if (sc.every(c => isBoss(c, hand, seen))) continue;            // pure cash — the boss branch owns it
+    const hasJ9 = honoursInSuit(sc) > 0;
+    if (!hasJ9 && sc.length < T.establishStrong) continue;         // ragged top-less suit — don't bleed it
+    const key = [sc.length, honoursInSuit(sc), handPoints(sc)];
+    if (!best || key[0] > bestKey[0]
+              || (key[0] === bestKey[0] && key[1] > bestKey[1])
+              || (key[0] === bestKey[0] && key[1] === bestKey[1] && key[2] > bestKey[2])) {
+      best = suit; bestKey = key;
+    }
+  }
+  return best;
 }
 
 /** Discard lowest-point card; prefer zero-point cards */

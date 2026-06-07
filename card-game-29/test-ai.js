@@ -36,8 +36,8 @@ const RSUIT = { spades: '♠', hearts: '♥', diamonds: '♦', clubs: '♣' };
 
 const C    = (rank, suitCh) => ({ rank, suit: SUIT[suitCh] });          // C('J','s') → ♠J
 const play = (seat, card)   => ({ playerIndex: seat, card });
-const seen = (played = [], toActAfter = [], declarerTrump = null) =>
-  ({ played: new Set(played.map(cardKey)), toActAfter, declarerTrump });
+const seen = (played = [], toActAfter = [], declarerTrump = null, noTrump = false) =>
+  ({ played: new Set(played.map(cardKey)), toActAfter, declarerTrump, noTrump });
 
 const isCard = (x) => x && typeof x === 'object' && 'rank' in x && 'suit' in x;
 const cstr   = (c) => isCard(c) ? `${c.rank}${RSUIT[c.suit]}` : String(c);
@@ -130,6 +130,63 @@ section('#5a declarer avoids leading concealed trump');
   check    ('…leads ♥7 instead', led, C('7', 'h'));
   check    ('control: no declarerTrump → would lead ♠J',
             aiLead(hand, null, seen([], [], null)), C('J', 's'));
+}
+
+// ══════════════════════════════════════════════════════════════════════════════════
+// #3 Phase 1 — No-Trump "establish the longest suit" lead (gated to seen.noTrump)
+// ══════════════════════════════════════════════════════════════════════════════════
+section('#3 Phase 1 — NT establish longest suit (else legacy low-lead)');
+{
+  // No Jack, no boss, a 4-card heart suit holding ♥9 (an honour) → establish: lead the LOWEST heart
+  // (♥8). Legacy (no seen) ignores length and dumps the globally-lowest zero-point card (♦7).
+  const hand = [C('K','h'), C('10','h'), C('9','h'), C('8','h'), C('7','d')];
+  check('NT + seen → establish hearts, lead low ♥8',
+        aiLead(hand, null, seen([], [], null, true)), C('8','h'));
+  check('legacy (no seen) → lowest zero-point ♦7',
+        aiLead(hand, null, null), C('7','d'));
+
+  // NT gate: seen present but noTrump=false (concealed/active trump) → establish must NOT fire, so the
+  // same hand falls through to the legacy low-lead. This protects concealed-trump play (#5/#6).
+  check('noTrump=false → establish skipped, legacy low-lead ♦7',
+        aiLead(hand, null, seen([], [], null, false)), C('7','d'));
+
+  // Ordering: a boss to cash always precedes establishing. ♣A is the top club (♣J/♣9 gone) → cash it
+  // even though hearts are establishable.
+  check('boss present → cash ♣A (boss branch precedes establish)',
+        aiLead([C('K','h'),C('10','h'),C('9','h'),C('8','h'),C('A','c')], null,
+               seen([C('J','c'),C('9','c')], [], null, true)), C('A','c'));
+
+  // Threshold guard: a ragged 4-card suit with no J/9 (♥K-Q-10-8) is not "developable" → rejected, so
+  // we fall through to the legacy low-lead (♦7) rather than the lowest heart (♥8).
+  check('ragged 4-suit (no J/9) → not established, legacy low-lead ♦7',
+        aiLead([C('K','h'),C('Q','h'),C('10','h'),C('8','h'),C('7','d')], null,
+               seen([], [], null, true)), C('7','d'));
+
+  // Jack precedence: a Jack still leads first in NT (it wins AND develops).
+  check('NT + Jack → Jack still leads first',
+        aiLead([C('J','h'),C('10','h'),C('9','h'),C('8','h'),C('K','d')], null,
+               seen([], [], null, true)), C('J','h'));
+}
+
+// ══════════════════════════════════════════════════════════════════════════════════
+// #3 Phase 1 — Game-1 / f4 reconstruction (the headline NT blunder, now fixed)
+// ══════════════════════════════════════════════════════════════════════════════════
+section('#3 Phase 1 — Game-1 NT: cash the top club instead of leading ♥8');
+{
+  // Game 1, trick 5: West is on lead in a No-Trump contract holding ♥8 ♠Q ♣A ♣9. With ♣K/♣Q/♣J/♣10/♣7
+  // already played, ♣9 and ♣A are the two highest clubs left (bosses) → cash a club (♣9). The logged
+  // blunder was leading ♥8 (the lowest zero-point card), which the legacy (seen=null) path reproduces.
+  const westHand = [C('8','h'), C('Q','s'), C('A','c'), C('9','c')];
+  const g1played = [
+    C('7','h'),C('Q','h'),C('A','h'),C('J','h'),   // trick 1
+    C('K','c'),C('10','c'),C('7','s'),C('7','c'),  // trick 2
+    C('8','c'),C('7','d'),C('Q','c'),C('8','s'),   // trick 3
+    C('J','c'),C('8','d'),C('Q','d'),C('10','s'),  // trick 4
+  ];
+  check('NT → West cashes the top club ♣9 (not ♥8)',
+        aiLead(westHand, null, seen(g1played, [], null, true)), C('9','c'));
+  check('legacy (seen=null) reproduces the ♥8 blunder',
+        aiLead(westHand, null, null), C('8','h'));
 }
 
 // ══════════════════════════════════════════════════════════════════════════════════

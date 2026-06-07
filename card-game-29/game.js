@@ -686,6 +686,7 @@ function doAIPlay() {
     played: seenPlayed,
     toActAfter,
     declarerTrump: (seat === state.declarer && !state.trumpRevealed && !state.isNoTrump) ? state.trumpSuit : null,
+    noTrump: state.isNoTrump === true,   // #3 — gates the No-Trump play strategy (false under concealed/active trump)
   };
 
   let card;

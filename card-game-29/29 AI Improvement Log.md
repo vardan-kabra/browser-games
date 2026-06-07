@@ -5,8 +5,9 @@
 > **“Changes applied — 2026-06-05”** below. Games logged: **5** (+ chat analysis of hands 8/9).
 > The user explicitly chose to act now ("update the game AI… everything incl. bidding & reveal")
 > rather than wait for the ~7–8-game threshold; bidding (#4) shipped as conservative, band-scoped,
-> reversible dials behind a Node regression harness. **Still open:** #3 (No-Trump strategy) and #5b
-> (stop drawing trump once both opponents are void) — deferred, see the Changes section.
+> reversible dials behind a Node regression harness. **Still open:** #3 (No-Trump strategy — **Phase 1
+> applied 2026-06-07**, Phases 2–4 pending) and #5b (stop drawing trump once both opponents are void) —
+> see the Changes sections.
 > Resume collecting exports; the next pass can retighten `AI_TUNING` against the new behaviour.
 >
 > **POST-PASS (2026-06-05): Games 4–5 logged** (match `m-1780656179625`, hands 2–3) — **played on the
@@ -75,6 +76,10 @@
    This is the root of f2/f3/f4.
    - *Candidate:* an NT branch in `aiPlayCard`/`aiLead` that prioritizes cashing sure winners and
      establishing the longest suit.
+   - ✅ **Phase 1 applied (2026-06-07)** — the "establish the longest suit" lead + the `seen.noTrump`
+     gate (see "Changes applied — 2026-06-07"). Cashing sure winners was already handled by #1; Phase 1
+     adds the *develop a long suit* half. Phases 2–4 (declarer winner-count, re-entry / hold-up, defender
+     partner-suit) remain open — staged so each is a small, test-covered, reversible diff.
 
 ### Bidding — `ai.js`
 4. **Aggressiveness of the ceiling stack.** `aiBidValue` (ai.js:59–81) stacks `fiveSuitBonus (+2)` and
@@ -226,6 +231,40 @@ unchanged**; the two edits affect only (a) whether a non-declarer's reveal is ga
 **Still open in the reveal area (left for more data):** a *defender*-caution dial (the G4-t6 bare-Ace
 misfire) — kept at the shipped threshold to avoid over-tightening without self-play data. Separately still
 queued: **Candidate #2 sub-case (iii)** bank-to-a-winning-partner, and the **Review trump-reveal display**.
+
+## Changes applied — 2026-06-07 (No-Trump pass, Phase 1)
+
+First phase of **Candidate #3** — a dedicated No-Trump play strategy, the root cause behind the Game-1
+play flags. The full NT strategy ships in **staged, independently-testable phases** (plan: establish-lead
+→ declarer winner-count → re-entry/hold-up → defender partner-suit). Phase 1 lands the foundational piece
+and its plumbing; later phases add role-aware declarer/defender logic. As with the earlier passes every
+change is **additive** and gated on a new `seen.noTrump` flag that is **false under any concealed/active
+trump**, so concealed-trump play (#5/#6) is provably untouched.
+
+**Enabling change.** `doAIPlay` (game.js) now sets `seen.noTrump = state.isNoTrump` on the card-tracking
+bag — the first signal that lets the AI tell a genuine No-Trump deal from "trump concealed" (both used to
+present as `trumpSuit = null` / `declarerTrump = null` to a non-declarer).
+
+- ✅ **#3 Phase 1 — establish the longest suit on lead (`aiLead`).** A new NT-only branch sits **between**
+  the boss-cash branch (#1) and the low-card fallback: with no Jack to lead and no boss to cash, the AI
+  leads the **lowest card of its longest "developable" suit** (`ntLongestEstablishSuit`) to promote that
+  suit's small cards into winners (no trump can ruff length away). A suit qualifies only if it is ≥4 long,
+  is not a pure cash (all bosses — the boss branch owns those), and either holds a J/9 or is ≥5 long (so a
+  ragged top-less suit isn't bled into opponents' tricks). Tie-break length → J/9 → points, mirroring
+  `preferredTrumpSuit`. New play dials live in `AI_TUNING.play.nt` (`establishMin:4`, `establishStrong:5`)
+  — the first *play*-strategy constants (only bidding had dials before). Replaces the old "dump the
+  globally-lowest zero-point card" passivity that lost Game 1.
+
+**Verification.** `node card-game-29/test-ai.js` → **49/49** (8 new #3 cases incl. the Game-1/f4
+reconstruction — West now cashes the top club ♣9 instead of the logged ♥8 blunder; the legacy `seen=null`
+path still reproduces the old ♥8, proving additivity; plus an explicit `noTrump=false → legacy` guard so
+the branch can never fire under concealed trump). Every prior defender/declarer/`seen=null` case still
+green. `node --check` clean on `ai.js`/`game.js`. Cache-busters: `ai.js v12→v13`, `game.js v16→v17`.
+
+**Deferred to later phases (per the staged plan):** **Phase 2** declarer winner-count → length bias
+(`seen.role`, `estimateNtTricks`); **Phase 3** re-entry retention (3a) + narrow hold-up (3b, may be
+dropped — low ROI in point-dense 29); **Phase 4** defender partner-suit inference (`seen.history`). #3
+stays **partially applied** until those land.
 
 ## Game log
 
