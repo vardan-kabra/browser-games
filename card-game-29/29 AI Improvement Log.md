@@ -596,11 +596,17 @@ the follow-suit branch just doesn't consult it when the partner is already winni
   a guard** — each trick should log exactly `trickSize` plays, each a card the seat actually holds.
 - **Trump-reveal flash too brief (UI).** ✅ *Done in the first pass* (flash 2.6 s / 5 reps, toast 2.7 s).
   When an AI reveals the trump, the on-screen indication doesn't stay long enough to read (hand 9 / f3).
-- **Show the trump reveal inside the post-hand Review (UI request, G4/G5 f-side note).** The 🔁
-  play-by-play review steps Bidding → tricks but never surfaces **when/what** trump was revealed. Add a
-  reveal indication at the trick where it happened: flip the trump indicator face-up (the 3-of-suit) at
-  `trumpReveal.atTrick`, keep it **face-down on earlier steps**, and show a small "Trump revealed: ♣ (by W)"
-  marker — mirroring the in-game reveal (`renderTrumpIndicator` face-down→face-up, optionally the same
-  flash). The review already reads core `state.tricks` / `state.dealtHands`; the reveal trick + suit live
-  in `state` (and `feedbackLog.trumpReveal`). Payoff: the replay becomes honest about *when* trump woke up
-  — why a given ruff worked, or why a trump card sat inert earlier. Self-contained, low-risk UI work.
+- ✅ **Show the trump reveal inside the post-hand Review — DONE 2026-06-07 (hand 14 f2).** Review now flips
+  the trump indicator face-**down** before the reveal trick and face-**up** at/after it, with a "🔔 ♠
+  revealed" marker on that step. Reads a new **core** field `state.trumpRevealTrick` (0-based, set in
+  `revealTrump`; falls back to `state.trumpRevealed` for open-from-start Single Hand / never-revealed) — so
+  it does **not** depend on `feedbackLog`. `renderTrumpIndicator(revealedOverride)` gained an optional
+  per-step override; `renderReviewTrick` passes `reviewTrickIndex >= state.trumpRevealTrick`; `onCloseReview`
+  restores the final state. Cache-busters `game.js v19→v20`.
+- ✅ **Green "led" arrow in Review — DONE 2026-06-07 (hand 14 f2).** Each review step marks the trick's
+  leader (`state.tricks[k].leader`) with a green ▸ on that seat's label (`.player-label.review-leader::before`,
+  cleared per step in `clearReviewWinner`). Cache-busters `style.css v15→v16`.
+- ⏳ **Play out the claimed line in Review (hand 15 f1 / Thread 3 follow-up).** Review currently stops at the
+  last *played* trick; after a claim it should step through the **forced** remaining tricks so the player can
+  see the claim was justified. Needs a `computeClaimLine` (the claim solver returns only a boolean today) +
+  review plumbing for synthetic post-claim tricks. Designed but not yet built.

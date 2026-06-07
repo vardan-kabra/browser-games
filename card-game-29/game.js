@@ -245,6 +245,7 @@ function startHand() {
   state.declarer       = null;
   state.trumpSuit      = null;
   state.trumpRevealed  = false;
+  state.trumpRevealTrick = null;   // #UI — 0-based trick index where trump was revealed (for review)
   state.isNoTrump      = false;
   state.forceTrumpOnly = false;
   state.marriageAdj = 0;
@@ -823,6 +824,7 @@ function playCard(seat, card) {
 function revealTrump(byWhom) {
   if (state.isNoTrump || state.trumpRevealed) return;
   state.trumpRevealed = true;
+  state.trumpRevealTrick = state.tricks.length;   // #UI — 0-based in-progress trick (review reveal-timing)
   // Move-log capture (AI-feedback): who revealed, at which (in-progress) trick.
   if (byWhom == null) console.warn('[feedback] revealTrump called without a revealer — crediting the declarer');
   feedbackLog.logReveal({ atTrick: state.tricks.length + 1, by: byWhom == null ? state.declarer : byWhom, suit: state.trumpSuit });
@@ -1209,7 +1211,7 @@ function renderNeedTaken() {
 
 // Indicator card next to the "Trump" label: face-down concealed, face-up 3-of-suit
 // on reveal, "No Trump" label for NT.
-function renderTrumpIndicator() {
+function renderTrumpIndicator(revealedOverride) {
   const slot = document.getElementById('trump-card-slot');
   if (!slot) return;
   slot.innerHTML = '';
@@ -1223,7 +1225,8 @@ function renderTrumpIndicator() {
     return;
   }
   if (!state.trumpSuit) return;
-  slot.appendChild(createCardEl({ rank: '3', suit: state.trumpSuit }, state.trumpRevealed));
+  const faceUp = revealedOverride !== undefined ? revealedOverride : state.trumpRevealed;
+  slot.appendChild(createCardEl({ rank: '3', suit: state.trumpSuit }, faceUp));
 }
 
 function renderHand(seat) {
@@ -1622,6 +1625,7 @@ function onCloseReview() {
   clearReviewWinner();
   showReviewAuction(false);                        // restore #center-area, hide the auction table
   for (let s = 0; s < 4; s++) renderHand(s);       // back to the full-8 face-up reveal
+  renderTrumpIndicator();                           // #UI — restore the final (revealed) trump state after stepping
   updateTrickArea();                               // restore the empty centre (currentTrick is [] at hand end)
   // Bring back the Hand Over / Match Over panel so the player can advance (Next Hand / New Match).
   if (endHandPanel && state.phase === PHASE.HAND_SCORING) endHandPanel();
@@ -1648,14 +1652,22 @@ function renderReviewTrick(k) {
     }
     document.getElementById(`trick-slot-${trick.winner}`)?.classList.add('trick-winner');
     document.getElementById(`label-${trick.winner}`)?.classList.add('trick-winner');
+    document.getElementById(`label-${trick.leader}`)?.classList.add('review-leader');   // #UI — green "led" arrow
   }
+  // #UI — reveal the trump indicator only from the trick where it was actually revealed (face-down
+  // before, face-up at/after). Falls back to state.trumpRevealed for open-from-start (Single Hand) or
+  // never-revealed hands.
+  const trumpUpAtStep = state.trumpRevealTrick != null
+    ? reviewTrickIndex >= state.trumpRevealTrick
+    : state.trumpRevealed;
+  renderTrumpIndicator(trumpUpAtStep);
   updateReviewIndicator();
   renderReviewNote();
 }
 function clearReviewWinner() {
   for (let seat = 0; seat < 4; seat++) {
     document.getElementById(`trick-slot-${seat}`)?.classList.remove('trick-winner');
-    document.getElementById(`label-${seat}`)?.classList.remove('trick-winner');
+    document.getElementById(`label-${seat}`)?.classList.remove('trick-winner', 'review-leader');
   }
 }
 function onReviewPrev() { if (reviewTrickIndex > -1) renderReviewTrick(reviewTrickIndex - 1); }
@@ -1675,7 +1687,9 @@ function updateReviewIndicator() {
   setText('review-count', `Trick ${reviewTrickIndex + 1} / ${n}`);
   if (prev) prev.disabled = false;                   // ‹ always available — steps back toward Bidding
   if (next) next.disabled = reviewTrickIndex >= n - 1;
-  setText('review-meta', t ? `${seatName(t.winner)} wins (+${t.points})` : '');
+  const revealHere = state.trumpRevealTrick != null && reviewTrickIndex === state.trumpRevealTrick && !state.isNoTrump;
+  setText('review-meta', (t ? `${seatName(t.winner)} wins (+${t.points})` : '')
+    + (revealHere ? ` · 🔔 ${SUIT_SYMBOL[state.trumpSuit]} revealed` : ''));
 }
 
 // Note-per-step: exactly ONE note per step (Bidding or a trick). Saving overwrites that step's

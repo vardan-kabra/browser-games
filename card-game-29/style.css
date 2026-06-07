@@ -258,6 +258,7 @@ html, body {
 }
 .trick-slot.trick-winner  { animation: winFlash 0.9s ease-in-out; border-radius: 8px; }
 .player-label.trick-winner { color: #fde047 !important; font-weight: 900 !important; }
+.player-label.review-leader::before { content: '▸'; color: #22c55e; font-weight: 900; margin-right: 3px; }  /* #UI — review: who led the trick */
 
 /* ── Overlay panels (confined below the toolbar, compact, centered) ──────────── */
 .overlay-panel {
