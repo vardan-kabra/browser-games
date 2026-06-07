@@ -606,6 +606,11 @@ the follow-suit branch just doesn't consult it when the partner is already winni
 - ✅ **Green "led" arrow in Review — DONE 2026-06-07 (hand 14 f2).** Each review step marks the trick's
   leader (`state.tricks[k].leader`) with a green ▸ on that seat's label (`.player-label.review-leader::before`,
   cleared per step in `clearReviewWinner`). Cache-busters `style.css v15→v16`.
+  - ⏳ **Refinement (user feedback 2026-06-07): reposition + enlarge the arrow.** Right now the ▸ sits on the
+    seat **name label** (e.g. "▸ EAST"/"▸ SOUTH"), off to the side, and is **too small**. Move it into the
+    **centre trick area, next to the leader's played card** (`#trick-slot-${leader}`) and orient by seat —
+    to the **right** of the card for East, **above** it for North, **left** for West, **below** for South —
+    and make it noticeably **bigger**. I.e. mark/position on the trick-slot, not `.player-label`.
 - ✅ **Play out the claimed line in Review — DONE 2026-06-07 (hand 15 f1 / Thread 3 follow-up).** After a
   claim, review now steps through the **forced** remaining tricks (labeled "claimed line") so the player can
   see the claim was justified. New `computeClaimLine` (ai.js) — a PV-minimax mirroring `claimHolds` that
