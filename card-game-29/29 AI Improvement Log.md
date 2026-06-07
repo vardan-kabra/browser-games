@@ -7,7 +7,8 @@
 > rather than wait for the ~7–8-game threshold; bidding (#4) shipped as conservative, band-scoped,
 > reversible dials behind a Node regression harness. **Status:** #3 (No-Trump strategy — **Phases 1–2
 > applied 2026-06-07**; 3b hold-up won't-build, Phase 4 defender-inference deferred pending evidence) and
-> **#5b** (stop drawing trump once both opponents are void, still open) — see the Changes sections.
+> **#5b** (stop drawing trump once both opponents are void — **resolved 2026-06-07 via Thread 1b's
+> void-inference**) — see the Changes sections.
 > Resume collecting exports; the next pass can retighten `AI_TUNING` against the new behaviour.
 >
 > **POST-PASS (2026-06-05): Games 4–5 logged** (match `m-1780656179625`, hands 2–3) — **played on the
@@ -161,8 +162,9 @@
 7. **Don't squander trumps; draw them when long.** Two layers, both from hand 3 (declarer's partner, N):
    - ✅ **(a) applied 2026-06-07 (Thread 1a)** — `safeDiscard` pitched a trump as junk under a winning
      partner; it is now trump-aware (sheds non-trump first). See the 2026-06-07 trump-husbandry change.
-   - ⏳ **(b) open (Thread 1b)** — proactive **trump-drawing**: with trump length/control the declaring
-     side should *lead* trumps to strip the opponents' (hand 3 f2/f3), preventing late ruffs. Larger add.
+   - ✅ **(b) applied 2026-06-07 (Thread 1b)** — proactive **trump-drawing**: the declaring side leads the
+     boss trump to strip opponents while one may still hold trump, stopping once they're void (void-
+     inference). Folds in #5b. See the 2026-06-07 trump-drawing change.
 
 ## Changes applied — 2026-06-05
 
@@ -362,6 +364,38 @@ while its 5-card sibling holds, 0 console errors. Cache-buster: `ai.js v15→v16
 **Note:** based on a single hand (consistent with the #6 residual that first flagged this dial). The
 endgame gate is the conservative, principled scope — revisit `endgameMax` or extend to mid-hand only if
 more defender reveal flags accumulate.
+
+## Changes applied — 2026-06-07 (trump-drawing — Thread 1b, folds in #5b)
+
+From hand 3 f2/f3 — the declaring side never drew trumps, so an opponent kept a trump that ruffed the last
+trick. Builds the **void-inference** the user asked for ("do it right"), which also resolves the long-open
+**#5b** (stop over-drawing). Additive: gated on new `seen.voids`/`seen.seat`; without them, byte-identical.
+
+**Enabling change.** `doAIPlay` (game.js) now computes **`seen.voids`** — per-seat known-void suits from
+public play (a seat that didn't follow the led suit is void in it) — and passes **`seen.seat`** (to identify
+opponents). `seen.role` is now set in **every** deal (was NT-only); `_ntRole` → `_seatRole`.
+
+- ✅ **#1b — draw trumps (`aiLead`).** New top branch: on the **declaring side**, once trump is revealed,
+  if the AI holds the **boss trump** (highest unplayed) and **at least one opponent is not known-void** in
+  trump, it leads the boss trump to strip them — winning the round and keeping the lead. It **stops the
+  moment both opponents are known void** (the remaining trumps are the partner's) — the **#5b** over-draw
+  guard. Placed before the side-suit leads (draw trumps before cashing winners that could be ruffed).
+  Defenders never draw (a defender's trump lead helps the declarer). Concealed trump → `trumpSuit` is null
+  → the branch never fires (you can't draw concealed; #5a already stops the declarer leading its hidden
+  trump). Pairs with #1a, which keeps the trumps there are to draw with.
+
+**Verification.** `node card-game-29/test-ai.js` → **74/74** (7 new #1b cases: declarer & partner draw the
+boss trump; the **#5b stop** when both opponents are void; defender no-draw; no-boss no-draw; and the
+`seen.voids=null` / `seen=null` legacy guards — byte-identical when un-plumbed). `node --check` clean on
+both files. Live bundle: `ai.js?v=17` / `game.js?v=19`; `doAIPlay` builds `voids` + wires `seat`/`_seatRole`
+(`_ntRole` gone); live `aiLead` draws ♠J, stops on opponents-void, defenders don't draw; 0 console errors.
+The branch only changes *which legal card* the declaring side leads (always a held trump) — never legality
+— so per-hand trick counts / the 29-point balance are unaffected. Cache-busters: `ai.js v16→v17`,
+`game.js v18→v19`.
+
+**Note:** void-inference uses only public play (who failed to follow), so it's legal for every seat. The
+residual uncertainty (outstanding trumps could be the partner's before any void shows) self-corrects after
+the first trump round, when the void info lands.
 
 ## Game log
 

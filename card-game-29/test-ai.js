@@ -36,8 +36,8 @@ const RSUIT = { spades: '♠', hearts: '♥', diamonds: '♦', clubs: '♣' };
 
 const C    = (rank, suitCh) => ({ rank, suit: SUIT[suitCh] });          // C('J','s') → ♠J
 const play = (seat, card)   => ({ playerIndex: seat, card });
-const seen = (played = [], toActAfter = [], declarerTrump = null, noTrump = false, role = null) =>
-  ({ played: new Set(played.map(cardKey)), toActAfter, declarerTrump, noTrump, role });
+const seen = (played = [], toActAfter = [], declarerTrump = null, noTrump = false, role = null, seat = null, voids = null) =>
+  ({ played: new Set(played.map(cardKey)), toActAfter, declarerTrump, noTrump, role, seat, voids });
 
 const isCard = (x) => x && typeof x === 'object' && 'rank' in x && 'suit' in x;
 const cstr   = (c) => isCard(c) ? `${c.rank}${RSUIT[c.suit]}` : String(c);
@@ -230,6 +230,38 @@ section('#3 Phase 2 — declarer establishes before cashing a lone side boss');
   const hand3 = [C('10','h'),C('9','h'),C('8','h'),C('7','h'),C('A','c')];
   check('declarer + 4-card suit (no length winners) → cash ♣A',
         aiLead(hand3, null, seen([C('J','c'),C('9','c')], [], null, true, 'declarer')), C('A','c'));
+}
+
+// ══════════════════════════════════════════════════════════════════════════════════
+// #1b — draw trumps: declaring side leads the boss trump while opponents hold trump
+// ══════════════════════════════════════════════════════════════════════════════════
+section('#1b draw trumps (void-inference; stops once opponents are void = #5b)');
+{
+  const declHand = [C('J','s'),C('10','s'),C('A','h'),C('8','d')];   // ♠ trump; ♠J is the boss trump
+  const none     = [new Set(),new Set(),new Set(),new Set()];        // nobody known void
+  // declarer (seat 0), ♠ revealed, holds boss ♠J, opponents (1,3) not known void → draw ♠J
+  check('declarer + boss trump + opp may hold trump → lead ♠J (draw)',
+        aiLead(declHand, 'spades', seen([], [], null, false, 'declarer', 0, none)), C('J','s'));
+  // partner (seat 2) draws too
+  check('partner + boss trump → also draws ♠J',
+        aiLead([C('J','s'),C('7','s'),C('K','h'),C('8','d')], 'spades', seen([], [], null, false, 'partner', 2, none)),
+        C('J','s'));
+  // #5b STOP: both opponents (1,3) known void in ♠ → outstanding ♠ are partner's → don't draw, lead ♦8
+  const oppsVoid = [new Set(),new Set(['spades']),new Set(),new Set(['spades'])];
+  check('both opponents void in trump → stop drawing, lead low ♦8',
+        aiLead(declHand, 'spades', seen([], [], null, false, 'declarer', 0, oppsVoid)), C('8','d'));
+  // defender never draws trumps
+  check('defender + boss trump → does NOT draw, lead low ♦8',
+        aiLead(declHand, 'spades', seen([], [], null, false, 'defender', 0, none)), C('8','d'));
+  // no boss trump in hand → don't initiate drawing
+  check('declaring side without the boss trump → no draw, lead low ♦8',
+        aiLead([C('10','s'),C('8','s'),C('A','h'),C('8','d')], 'spades', seen([], [], null, false, 'declarer', 0, none)),
+        C('8','d'));
+  // legacy: no void-tracking, or no seen → byte-identical (no draw; declarer avoids own trump → ♦8)
+  check('no seen.voids (legacy) → no draw, lead low ♦8',
+        aiLead(declHand, 'spades', seen([], [], null, false, 'declarer', 0, null)), C('8','d'));
+  check('seen=null legacy → no draw, lead low ♦8',
+        aiLead(declHand, 'spades', null), C('8','d'));
 }
 
 // ══════════════════════════════════════════════════════════════════════════════════

@@ -301,6 +301,25 @@ function aiPlayCard(hand, trick, trumpSuit, declarerIndex, seatIndex, seen = nul
 function aiLead(hand, trumpSuit, seen = null) {
   if (!hand || hand.length === 0) return null;
   const inSuit = (suit) => hand.filter(c => c.suit === suit);
+
+  // 0) Draw trumps (#1b): on the declaring side, once trump is revealed, lead the boss trump to strip
+  //    the opponents — but only while an OPPONENT may still hold trump (void-inference via seen.voids).
+  //    Once both opponents are known void we stop, so we never pull our partner's trumps (the #5b guard).
+  //    Gated on seen.voids + seen.seat; without them (legacy) this branch is skipped.
+  if (seen && seen.voids && seen.seat != null && trumpSuit &&
+      (seen.role === 'declarer' || seen.role === 'partner')) {
+    const trumps = inSuit(trumpSuit);
+    const bossTrump = trumps.find(c => isBoss(c, hand, seen));
+    if (bossTrump) {
+      let playedTrumps = 0;
+      for (const k of seen.played) if (k.endsWith('-' + trumpSuit)) playedTrumps++;
+      const outstanding = 8 - trumps.length - playedTrumps;
+      const oppHoldsTrump = [0, 1, 2, 3].some(s =>
+        !_samePartnership(s, seen.seat) && !(seen.voids[s] && seen.voids[s].has(trumpSuit)));
+      if (outstanding > 0 && oppHoldsTrump) return bossTrump;   // win the round and draw a trump
+    }
+  }
+
   // Avoid leading our own trump. While trump is concealed the declarer still knows it
   // (seen.declarerTrump) — without this it would lead its own hidden trump as "the longest suit"
   // and over-draw it. `trumpSuit` is the active (revealed) trump for everyone.

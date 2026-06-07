@@ -635,8 +635,8 @@ function advancePlay() {
   }
 }
 
-// #3 — the AI's role in a No-Trump deal (drives role-aware NT play in ai.js). Null outside NT.
-function _ntRole(seat, declarer) {
+// The AI's seat role relative to the declarer (#3 NT play + #1b draw-trumps). Set in every deal.
+function _seatRole(seat, declarer) {
   if (seat === declarer) return 'declarer';
   return (seat % 2 === declarer % 2) ? 'partner' : 'defender';
 }
@@ -688,12 +688,25 @@ function doAIPlay() {
   const toActAfter = [];
   let _s = seat;
   for (let i = trickSize() - state.currentTrick.length - 1; i > 0; i--) { _s = nextActiveSeat(_s); toActAfter.push(_s); }
+  // #1b — known voids from public play: a seat that didn't follow the led suit is void in it.
+  const voids = [new Set(), new Set(), new Set(), new Set()];
+  for (const t of state.tricks) {
+    if (!t.plays || !t.plays.length) continue;
+    const led = t.plays[0].card.suit;
+    for (const p of t.plays) if (p.card.suit !== led) voids[p.seat].add(led);
+  }
+  if (state.currentTrick.length) {
+    const led = state.currentTrick[0].card.suit;
+    for (const p of state.currentTrick) if (p.card.suit !== led) voids[p.playerIndex].add(led);
+  }
   const seen = {
     played: seenPlayed,
     toActAfter,
     declarerTrump: (seat === state.declarer && !state.trumpRevealed && !state.isNoTrump) ? state.trumpSuit : null,
     noTrump: state.isNoTrump === true,   // #3 — gates the No-Trump play strategy (false under concealed/active trump)
-    role: state.isNoTrump ? _ntRole(seat, state.declarer) : null,   // #3 Phase 2 — declarer/partner/defender
+    role: _seatRole(seat, state.declarer),   // #3/#1b — declarer/partner/defender (every deal)
+    seat,                                    // #1b — identify opponents for draw-trumps
+    voids,                                   // #1b — per-seat known-void suits (public info)
   };
 
   let card;
