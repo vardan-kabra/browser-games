@@ -409,7 +409,7 @@ function aiDiscard(hand, trick, trumpSuit, seatIndex) {
   if (partnerWinning) {
     const onlyTrumps = trumpSuit && hand.every(c => c.suit === trumpSuit);
     if (onlyTrumps) return lowestCard(hand);   // forced — play the lowest trump
-    return safeDiscard(hand);
+    return safeDiscard(hand, trumpSuit);
   }
 
   // Try to trump to win — only if trump is active (caller passes null when concealed).
@@ -420,7 +420,7 @@ function aiDiscard(hand, trick, trumpSuit, seatIndex) {
     if (winning.length) return lowestCard(winning);
   }
 
-  return safeDiscard(hand);
+  return safeDiscard(hand, trumpSuit);
 }
 
 // ── Internal helpers ──────────────────────────────────────────────────────────
@@ -518,10 +518,15 @@ function ntLengthWinners(suit, hand, seen) {
   return Math.max(0, myLen - outstanding);
 }
 
-/** Discard lowest-point card; prefer zero-point cards */
-function safeDiscard(hand) {
-  const zeroPt = hand.filter(c => POINT_VALUE[c.rank] === 0);
-  return lowestCard(zeroPt.length ? zeroPt : hand);
+/** Discard the least valuable card. Prefer pitching NON-TRUMP junk so trump length is kept for
+ *  ruffing / drawing trumps later (#1a); only pitch a trump when the hand is all trump. Within the
+ *  chosen pool, prefer zero-point cards, then the lowest rank. With no active trump (trumpSuit
+ *  null / No Trump) the pool is the whole hand — byte-identical to the original behaviour. */
+function safeDiscard(hand, trumpSuit) {
+  const nonTrump = trumpSuit ? hand.filter(c => c.suit !== trumpSuit) : hand;
+  const pool     = nonTrump.length ? nonTrump : hand;   // forced to pitch trump only if nothing else
+  const zeroPt   = pool.filter(c => POINT_VALUE[c.rank] === 0);
+  return lowestCard(zeroPt.length ? zeroPt : pool);
 }
 
 // ── Claim solver (§8) ───────────────────────────────────────────────────────────

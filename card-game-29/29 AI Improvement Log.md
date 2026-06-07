@@ -157,6 +157,13 @@
      but the *fair* one. (`knownTrump` itself is fine — `null` for non-declarers.) Pairs with the
      defender-caution refinement above, so a defender doesn't wake the declarer's trump cheaply.
 
+### Trump husbandry — `ai.js`
+7. **Don't squander trumps; draw them when long.** Two layers, both from hand 3 (declarer's partner, N):
+   - ✅ **(a) applied 2026-06-07 (Thread 1a)** — `safeDiscard` pitched a trump as junk under a winning
+     partner; it is now trump-aware (sheds non-trump first). See the 2026-06-07 trump-husbandry change.
+   - ⏳ **(b) open (Thread 1b)** — proactive **trump-drawing**: with trump length/control the declaring
+     side should *lead* trumps to strip the opponents' (hand 3 f2/f3), preventing late ruffs. Larger add.
+
 ## Changes applied — 2026-06-05
 
 First tuning pass. All play-logic changes are **additive and backward-compatible**: `aiPlayCard` /
@@ -302,6 +309,32 @@ legal card* the declarer leads — never legality — so the per-hand 29-point b
 
 **Deferred:** **Phase 3b** narrow hold-up (low ROI — likely dropped) and **Phase 4** defender partner-suit
 inference (`seen.history`). #3 stays **partially applied** until Phase 4 lands.
+
+## Changes applied — 2026-06-07 (trump husbandry — Thread 1a)
+
+From the new batch of exports (hands 3, 5, 10, 12–15). **Thread 1a of the trump-management theme** —
+`safeDiscard` wasted trumps. **Confirmed bug; fix is surgical and additive.**
+
+- ✅ **#1a — `safeDiscard` keeps trump (ai.js).** When the AI is void and must discard (including under a
+  winning partner — the C8 path in `aiDiscard`), `safeDiscard(hand, trumpSuit)` now pitches **non-trump**
+  junk and only sheds a trump when the hand is all trump — preserving trump length for ruffing / drawing.
+  `aiDiscard` passes `trumpSuit` through. With no active trump (concealed / No Trump → `trumpSuit` null)
+  the pool is the whole hand, so behaviour is **byte-identical** to before.
+  - *Evidence:* Hand 3, trick 2 — North, void in ♦ with partner South already winning the ruff (♣9),
+    pitched **♣8 (a trump)** instead of ♠8. Root cause: the old `safeDiscard` filtered to zero-point cards
+    with no trump-awareness, so a zero-point trump (♣8) tied with a non-trump (♠8) on rank and got dumped.
+    Wasting that trump fed the later loss (East kept a club that ruffed the last trick — hand 3 f2/f3).
+
+**Verification.** `node card-game-29/test-ai.js` → **64/64** (5 new #1a cases: trump-aware pitch, all-trump
+forced, the `trumpSuit=null` legacy guard, the Hand-3 `aiDiscard` reproduction, and a partner-not-winning
+fallback case that covers **both** `aiDiscard` call sites; every prior case green).
+`node --check` clean. Live no-cache bundle: `ai.js?v=15`, `safeDiscard` arity 2, the Hand-3 position now
+pitches ♠8 (keeps ♣8), legacy null path still ♣8, 0 console errors. Cache-buster: `ai.js v14→v15`
+(game.js unchanged).
+
+**Still open in this theme — Thread 1b (proactive trump-drawing):** when the declaring side has trump
+length/control it should *lead* trumps to strip the opponents' (hand 3 f2/f3) — a larger strategic add,
+not in this pass.
 
 ## Game log
 

@@ -24,7 +24,7 @@ const glue = `;Object.assign(globalThis, {
   SUITS, RANK_ORDER, POINT_VALUE, cardKey, cardBeats, trickWinner, sameCard, legalPlays,
   AI_TUNING, aiLead, aiFollowSuit, aiPlayCard, aiDiscard, aiBidValue, aiBidValueAgainstHolder,
   aiShouldReveal, aiShouldSingleHand, isBoss, highestCard, lowestCard, highestPointCard,
-  trickCurrentWinner, ntLengthWinners,
+  trickCurrentWinner, ntLengthWinners, safeDiscard,
 });`;
 eval(cardsSrc + '\n' + aiSrc + '\n' + glue);
 
@@ -230,6 +230,42 @@ section('#3 Phase 2 — declarer establishes before cashing a lone side boss');
   const hand3 = [C('10','h'),C('9','h'),C('8','h'),C('7','h'),C('A','c')];
   check('declarer + 4-card suit (no length winners) → cash ♣A',
         aiLead(hand3, null, seen([C('J','c'),C('9','c')], [], null, true, 'declarer')), C('A','c'));
+}
+
+// ══════════════════════════════════════════════════════════════════════════════════
+// #1a — safeDiscard / aiDiscard keep trump: pitch NON-TRUMP junk, not a trump
+// ══════════════════════════════════════════════════════════════════════════════════
+section('#1a safeDiscard preserves trump when pitching junk');
+{
+  // zero-point trump (♣8) and zero-point non-trump (♠8) both present, trump ♣ → pitch ♠8, keep ♣8.
+  check('trump-aware → pitch non-trump ♠8 (keep ♣8)',
+        safeDiscard([C('8','c'),C('8','s'),C('K','h')], 'clubs'), C('8','s'));
+  // all-trump hand → forced to pitch the lowest trump
+  check('all trump → forced lowest trump ♣8',
+        safeDiscard([C('8','c'),C('K','c'),C('J','c')], 'clubs'), C('8','c'));
+  // no active trump (null) → original behaviour: lowest zero-point card by rank (here ♣8 first)
+  check('trumpSuit null → legacy lowest zero-point ♣8',
+        safeDiscard([C('8','c'),C('8','s'),C('K','h')], null), C('8','c'));
+}
+
+section('#1a aiDiscard preserves trump under a winning partner (Hand 3, trick 2)');
+{
+  // Trump ♣ (revealed). Trick: W led ♦9, partner S ruffed ♣9 (winning), E ♦K. North (seat 2) is void
+  // in diamonds and must discard — it should pitch a NON-trump (♠8), NOT waste a trump (♣8).
+  const north = [C('8','c'),C('J','c'),C('8','s'),C('K','h'),C('J','s'),C('A','s'),C('10','h')];
+  const trick = [play(3,C('9','d')), play(0,C('9','c')), play(1,C('K','d'))];
+  check('partner ruffing-winner + void → pitch ♠8, keep ♣8 trump',
+        aiDiscard(north, trick, 'clubs', 2), C('8','s'));
+}
+
+section('#1a aiDiscard keeps a non-winning trump (partner-not-winning fallback path)');
+{
+  // Trump ♣. Opponent E ruffed (♣J) and is winning; North (seat 2) is void in spades, holds a low trump
+  // ♣7 that can't beat ♣J plus non-trump junk. It must discard — keep ♣7, pitch ♦8 (covers ai.js:423).
+  const north = [C('7','c'),C('8','d'),C('K','h')];
+  const trick = [play(0,C('K','s')), play(1,C('J','c'))];
+  check('cannot ruff-win, opp winning → pitch ♦8, keep ♣7 trump',
+        aiDiscard(north, trick, 'clubs', 2), C('8','d'));
 }
 
 // ══════════════════════════════════════════════════════════════════════════════════
