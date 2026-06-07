@@ -5,9 +5,9 @@
 > **“Changes applied — 2026-06-05”** below. Games logged: **5** (+ chat analysis of hands 8/9).
 > The user explicitly chose to act now ("update the game AI… everything incl. bidding & reveal")
 > rather than wait for the ~7–8-game threshold; bidding (#4) shipped as conservative, band-scoped,
-> reversible dials behind a Node regression harness. **Still open:** #3 (No-Trump strategy — **Phase 1
-> applied 2026-06-07**, Phases 2–4 pending) and #5b (stop drawing trump once both opponents are void) —
-> see the Changes sections.
+> reversible dials behind a Node regression harness. **Status:** #3 (No-Trump strategy — **Phases 1–2
+> applied 2026-06-07**; 3b hold-up won't-build, Phase 4 defender-inference deferred pending evidence) and
+> **#5b** (stop drawing trump once both opponents are void, still open) — see the Changes sections.
 > Resume collecting exports; the next pass can retighten `AI_TUNING` against the new behaviour.
 >
 > **POST-PASS (2026-06-05): Games 4–5 logged** (match `m-1780656179625`, hands 2–3) — **played on the
@@ -81,8 +81,12 @@
    - ✅ **Phase 2 applied (2026-06-07)** — role-aware declarer play (`seen.role`, `ntLengthWinners`): the
      NT declarer **establishes a strong long suit before cashing a lone side boss** (keeps it as a
      re-entry). This **folded in the planned Phase 3a** (re-entry retention) — they were one behaviour.
-     **Still open:** Phase 3b (narrow hold-up — likely dropped, low ROI in point-dense 29) and Phase 4
-     (defender partner-suit inference via `seen.history`). Staged as small, test-covered, reversible diffs.
+   - **Decision (2026-06-07): #3 concluded with Phases 1–2** — the declarer/leading side, where all the
+     logged evidence (Game 1) actually was. **Phase 3b (hold-up): won't-build** — high regression surface
+     on `aiFollowSuit`, low ROI in point-dense 8-trick 29 (ducking risks conceding point tricks), and no
+     evidence. **Phase 4 (defender partner-suit): deferred** pending a logged NT-defense flag — 29 has no
+     signaling, so it's pure played-card inference and speculative without evidence. Per the project's
+     feedback-driven workflow, resume collecting NT exports; build 3b/4 only if a hand demonstrates the need.
 
 ### Bidding — `ai.js`
 4. **Aggressiveness of the ceiling stack.** `aiBidValue` (ai.js:59–81) stacks `fiveSuitBonus (+2)` and
